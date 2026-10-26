@@ -2,9 +2,11 @@
 from django.conf import settings
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.functions import (
     authenticate_user,
@@ -86,5 +88,52 @@ class LoginView(APIView):
             secure=secure_cookie,
             samesite="Lax",
         )
+
+        return response
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response(
+                {"detail": "Refresh token is missing."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError:
+            return Response(
+                {"detail": "Refresh token is invalid."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        response = Response(
+            {
+                "detail": (
+                    "Log-Out successfully! All Tokens will be deleted. "
+                    "Refresh token is now invalid."
+                )
+            },
+            status=status.HTTP_200_OK,
+        )
+
+        secure_cookie = not settings.DEBUG
+
+        for cookie_name in ("access_token", "refresh_token"):
+            response.set_cookie(
+                cookie_name,
+                "",
+                max_age=0,
+                httponly=True,
+                secure=secure_cookie,
+                samesite="Lax",
+                path="/",
+            )
 
         return response
