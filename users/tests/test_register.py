@@ -1,76 +1,99 @@
 
-import pytest
-from rest_framework.test import APIClient
+from django.contrib.auth import get_user_model
+
+from rest_framework.test import APITestCase
 
 
-@pytest.fixture
-def api_client():
-    return APIClient()
+User = get_user_model()
 
 
-@pytest.mark.django_db
-def test_register_creates_user(api_client):
-    response = api_client.post(
-        "/api/register/",
-        {
-            "username": "quiz_user",
-            "email": "quiz@example.com",
-            "password": "StrongPass123!",
-            "confirmed_password": "StrongPass123!",
-        },
-        format="json",
-    )
+class RegisterTests(APITestCase):
 
-    assert response.status_code == 201
-    assert response.json() == {
-        "detail": "User created successfully!"
-    }
+    def test_register_creates_user(self):
+        response = self.client.post(
+            "/api/register/",
+            {
+                "username": "quiz_user",
+                "email": "quiz@example.com",
+                "password": "StrongPass123!",
+                "confirmed_password": "StrongPass123!",
+            },
+            format="json",
+        )
 
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            response.json(),
+            {
+                "detail": "User created successfully!"
+            },
+        )
 
-@pytest.mark.django_db
-def test_register_rejects_missing_fields(api_client):
-    response = api_client.post(
-        "/api/register/",
-        {},
-        format="json",
-    )
+    def test_register_rejects_missing_fields(self):
+        response = self.client.post(
+            "/api/register/",
+            {},
+            format="json",
+        )
 
-    assert response.status_code == 400
+        self.assertEqual(response.status_code, 400)
 
+    def test_register_rejects_password_mismatch(self):
+        response = self.client.post(
+            "/api/register/",
+            {
+                "username": "quiz_user",
+                "email": "quiz@example.com",
+                "password": "StrongPass123!",
+                "confirmed_password": "DifferentPass123!",
+            },
+            format="json",
+        )
 
-@pytest.mark.django_db
-def test_register_rejects_password_mismatch(api_client):
-    response = api_client.post(
-        "/api/register/",
-        {
-            "username": "quiz_user",
-            "email": "quiz@example.com",
-            "password": "StrongPass123!",
-            "confirmed_password": "DifferentPass123!",
-        },
-        format="json",
-    )
+        self.assertEqual(response.status_code, 400)
 
-    assert response.status_code == 400
+    def test_register_rejects_duplicate_email(self):
+        User.objects.create_user(
+            username="existing_user",
+            email="quiz@example.com",
+            password="ExistingPass123!",
+        )
 
+        response = self.client.post(
+            "/api/register/",
+            {
+                "username": "new_user",
+                "email": "quiz@example.com",
+                "password": "StrongPass123!",
+                "confirmed_password": "StrongPass123!",
+            },
+            format="json",
+        )
 
-@pytest.mark.django_db
-def test_register_rejects_duplicate_email(api_client, django_user_model):
-    django_user_model.objects.create_user(
-        username="existing_user",
-        email="quiz@example.com",
-        password="ExistingPass123!",
-    )
+        self.assertEqual(response.status_code, 400)
 
-    response = api_client.post(
-        "/api/register/",
-        {
-            "username": "new_user",
-            "email": "quiz@example.com",
-            "password": "StrongPass123!",
-            "confirmed_password": "StrongPass123!",
-        },
-        format="json",
-    )
+    def test_register_rejects_duplicate_username(self):
+        User.objects.create_user(
+            username="existing_user",
+            email="existing@example.com",
+            password="ExistingPass123!",
+        )
 
-    assert response.status_code == 400
+        response = self.client.post(
+            "/api/register/",
+            {
+                "username": "existing_user",
+                "email": "new@example.com",
+                "password": "StrongPass123!",
+                "confirmed_password": "StrongPass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {
+                "detail": "Username is already taken."
+            },
+        )

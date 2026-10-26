@@ -1,5 +1,6 @@
 
 from .settings import *
+DEBUG = True
 
 # Use a fast password hasher during tests.
 PASSWORD_HASHERS = [

@@ -31,3 +31,20 @@ def create_registered_user(data):
         email=data["email"],
         password=data["password"],
     )
+
+
+
+def authenticate_user(username, password):
+    from django.contrib.auth import authenticate
+
+    return authenticate(username=username, password=password)
+
+
+def create_auth_tokens(user):
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    refresh = RefreshToken.for_user(user)
+    return {
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    }
