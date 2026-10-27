@@ -137,3 +137,39 @@ class LogoutView(APIView):
             )
 
         return response
+
+
+class TokenRefreshView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response(
+                {"detail": "Refresh token is missing."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+            access_token = str(token.access_token)
+        except TokenError:
+            return Response(
+                {"detail": "Refresh token is invalid."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        response = Response(
+            {"detail": "Token refreshed"},
+            status=status.HTTP_200_OK,
+        )
+        response.set_cookie(
+            "access_token",
+            access_token,
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite="Lax",
+            path="/",
+        )
+        return response
