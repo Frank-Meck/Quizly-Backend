@@ -9,6 +9,8 @@ from users.views import (
     TokenRefreshView,
 )
 
+from quizzes.views import CreateQuizView
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -19,5 +21,10 @@ urlpatterns = [
         "api/token/refresh/",
         TokenRefreshView.as_view(),
         name="token_refresh",
+    ),
+    path(
+        "api/quizzes/",
+        CreateQuizView.as_view(),
+        name="create_quiz",
     ),
 ]
