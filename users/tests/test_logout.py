@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
+from users.serializers import LogoutSerializer
 
 User = get_user_model()
 
@@ -57,3 +58,29 @@ class LogoutTests(APITestCase):
             response.status_code,
             status.HTTP_401_UNAUTHORIZED,
         )
+
+
+class LogoutSerializerTests(APITestCase):
+
+    def test_logout_serializer_accepts_valid_refresh_token(self):
+        user = User.objects.create_user(
+            username="logout_user",
+            email="logout@example.com",
+            password="StrongPass123!",
+        )
+
+        refresh_token = str(RefreshToken.for_user(user))
+
+        serializer = LogoutSerializer(
+            data={"refresh_token": refresh_token}
+        )
+
+        self.assertTrue(serializer.is_valid())
+
+    def test_logout_serializer_rejects_invalid_refresh_token(self):
+        serializer = LogoutSerializer(
+            data={"refresh_token": "invalid-refresh-token"}
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("refresh_token", serializer.errors)

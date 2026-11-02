@@ -9,6 +9,8 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
+from users.serializers import TokenRefreshSerializer
+
 
 User = get_user_model()
 
@@ -79,3 +81,46 @@ class TokenRefreshTests(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+class TokenRefreshSerializerTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="serializeruser",
+            email="serializer@example.com",
+            password="TestPassword123!",
+        )
+        self.refresh = RefreshToken.for_user(self.user)
+        self.refresh_token = str(self.refresh)
+
+    def test_serializer_accepts_valid_refresh_token(self):
+        serializer = TokenRefreshSerializer(
+            data={"refresh_token": self.refresh_token}
+        )
+
+        self.assertTrue(serializer.is_valid())
+        self.assertIn("access_token", serializer.validated_data)
+
+    def test_serializer_rejects_invalid_refresh_token(self):
+        serializer = TokenRefreshSerializer(
+            data={"refresh_token": "invalid-refresh-token"}
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+    def test_serializer_rejects_expired_refresh_token(self):
+        self.refresh.set_exp(
+            from_time=timezone.now() - timedelta(days=1),
+            lifetime=timedelta(seconds=0),
+        )
+        serializer = TokenRefreshSerializer(
+            data={"refresh_token": str(self.refresh)}
+        )
+
+        self.assertFalse(serializer.is_valid())
+
+    def test_serializer_rejects_blacklisted_refresh_token(self):
+        self.refresh.blacklist()
+        serializer = TokenRefreshSerializer(
+            data={"refresh_token": self.refresh_token}
+        )
+
+        self.assertFalse(serializer.is_valid())

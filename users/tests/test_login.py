@@ -3,6 +3,9 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 
 from rest_framework.test import APITestCase
+from rest_framework.exceptions import AuthenticationFailed
+
+from users.serializers import LoginSerializer
 
 
 User = get_user_model()
@@ -141,3 +144,39 @@ class LoginTests(APITestCase):
         self.assertTrue(
             response.cookies["refresh_token"]["secure"]
         )
+
+
+class LoginSerializerTests(APITestCase):
+
+    def test_login_serializer_accepts_valid_credentials(self):
+        User.objects.create_user(
+            username="quiz_user",
+            email="quiz@example.com",
+            password="StrongPass123!",
+        )
+
+        serializer = LoginSerializer(
+            data={
+                "username": "quiz_user",
+                "password": "StrongPass123!",
+            }
+        )
+
+        self.assertTrue(serializer.is_valid())
+
+    def test_login_serializer_rejects_invalid_credentials(self):
+        User.objects.create_user(
+            username="quiz_user",
+            email="quiz@example.com",
+            password="StrongPass123!",
+        )
+
+        serializer = LoginSerializer(
+            data={
+                "username": "quiz_user",
+                "password": "WrongPassword123!",
+            }
+        )
+
+        with self.assertRaises(AuthenticationFailed):
+            serializer.is_valid()

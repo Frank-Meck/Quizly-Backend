@@ -9,7 +9,7 @@ from users.views import (
     TokenRefreshView,
 )
 
-from quizzes.views import CreateQuizView
+from quizzes.views import CreateQuizView, GetQuizView
 
 
 urlpatterns = [
@@ -26,5 +26,10 @@ urlpatterns = [
         "api/quizzes/",
         CreateQuizView.as_view(),
         name="create_quiz",
+    ),
+    path(
+        "api/quizzes/<int:pk>/",
+        GetQuizView.as_view(),
+        name="get_quiz",
     ),
 ]

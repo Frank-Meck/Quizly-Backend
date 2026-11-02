@@ -1,18 +1,17 @@
-
 from django.conf import settings
 
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.functions import (
-    authenticate_user,
-    create_auth_tokens,
-    create_registered_user,
-    validate_registration_data,
+from users.functions import create_auth_tokens
+from users.serializers import (
+    LoginSerializer,
+    LogoutSerializer,
+    RegisterSerializer,
+    TokenRefreshSerializer,
 )
 
 
@@ -20,15 +19,9 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        error = validate_registration_data(request.data)
-
-        if error:
-            return Response(
-                {"detail": error},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        create_registered_user(request.data)
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
         return Response(
             {"detail": "User created successfully!"},
@@ -40,23 +33,10 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not username or not password:
-            return Response(
-                {"detail": "All fields are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = authenticate_user(username, password)
-
-        if user is None:
-            return Response(
-                {"detail": "Invalid username or password."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
+        user = serializer.validated_data["user"]
         tokens = create_auth_tokens(user)
 
         response = Response(
@@ -104,14 +84,19 @@ class LogoutView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        serializer = LogoutSerializer(
+            data={"refresh_token": refresh_token}
+        )
+
         try:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        except TokenError:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError:
             return Response(
                 {"detail": "Refresh token is invalid."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
+        serializer.save()
 
         response = Response(
             {
@@ -151,10 +136,11 @@ class TokenRefreshView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        try:
-            token = RefreshToken(refresh_token)
-            access_token = str(token.access_token)
-        except TokenError:
+        serializer = TokenRefreshSerializer(
+            data={"refresh_token": refresh_token}
+        )
+
+        if not serializer.is_valid():
             return Response(
                 {"detail": "Refresh token is invalid."},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -164,12 +150,14 @@ class TokenRefreshView(APIView):
             {"detail": "Token refreshed"},
             status=status.HTTP_200_OK,
         )
+
         response.set_cookie(
             "access_token",
-            access_token,
+            serializer.validated_data["access_token"],
             httponly=True,
             secure=not settings.DEBUG,
             samesite="Lax",
             path="/",
         )
+
         return response
