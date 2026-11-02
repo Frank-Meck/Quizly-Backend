@@ -33,6 +33,13 @@ class CreateQuizView(APIView):
         return Response(QuizSerializer(quiz).data, status=201)
 
 
+    def get(self, request):
+        quizzes = Quiz.objects.filter(user=request.user)
+        serializer = QuizSerializer(quizzes, many=True)
+
+        return Response(serializer.data, status=200)
+
+
 class GetQuizView(APIView):
     permission_classes = [IsAuthenticated]
 
