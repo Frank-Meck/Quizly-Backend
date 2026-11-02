@@ -10,6 +10,7 @@ from quizzes.serializers import (
     CreateQuizDataSerializer,
     CreateQuizSerializer,
     QuizSerializer,
+    UpdateQuizSerializer,
 )
 
 
@@ -52,3 +53,19 @@ class GetQuizView(APIView):
         serializer = QuizSerializer(quiz)
 
         return Response(serializer.data, status=200)
+
+    def patch(self, request, pk):
+        quiz = get_object_or_404(
+            Quiz,
+            pk=pk,
+            user=request.user,
+        )
+        serializer = UpdateQuizSerializer(
+            quiz,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(QuizSerializer(quiz).data, status=200)

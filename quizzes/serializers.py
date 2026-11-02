@@ -98,3 +98,29 @@ class QuizSerializer(serializers.ModelSerializer):
             "video_url",
             "questions",
         ]
+
+
+class UpdateQuizSerializer(serializers.ModelSerializer):
+
+    def validate_video_url(self, value):
+        hostname = urlparse(value).hostname or ""
+        allowed_domains = {
+            "youtube.com",
+            "www.youtube.com",
+            "youtu.be",
+        }
+
+        if hostname.lower() not in allowed_domains:
+            raise serializers.ValidationError(
+                "A YouTube URL is required."
+            )
+
+        return value
+
+    class Meta:
+        model = Quiz
+        fields = [
+            "title",
+            "description",
+            "video_url",
+        ]
