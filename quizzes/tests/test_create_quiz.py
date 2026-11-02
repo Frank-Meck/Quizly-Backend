@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APITestCase
 
+from unittest.mock import patch
+
 from quizzes.models import Question, Quiz
 
 
@@ -133,12 +135,36 @@ class CreateQuizTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
 
-    def test_create_quiz_accepts_valid_youtube_url(self):
+
+
+    @patch("quizzes.views.generate_quiz_data", create=True)
+    def test_create_quiz_accepts_valid_youtube_url(
+        self,
+        mock_generate_quiz_data,
+    ):
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",
         )
         self.client.force_authenticate(user=user)
+
+        mock_generate_quiz_data.return_value = {
+            "title": "Python Basics",
+            "description": "An introduction to Python.",
+            "questions": [
+                {
+                    "question_title": f"Question {number}",
+                    "question_options": [
+                        "Option A",
+                        "Option B",
+                        "Option C",
+                        "Option D",
+                    ],
+                    "answer": "Option A",
+                }
+                for number in range(1, 11)
+            ],
+        }
 
         response = self.client.post(
             "/api/quizzes/",
@@ -146,5 +172,9 @@ class CreateQuizTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 501)
-
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Quiz.objects.count(), 1)
+        self.assertEqual(Question.objects.count(), 10)
+        mock_generate_quiz_data.assert_called_once_with(
+            "https://www.youtube.com/watch?v=example"
+        )
