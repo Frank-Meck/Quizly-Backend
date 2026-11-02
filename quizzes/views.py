@@ -69,3 +69,13 @@ class GetQuizView(APIView):
         serializer.save()
 
         return Response(QuizSerializer(quiz).data, status=200)
+
+    def delete(self, request, pk):
+        quiz = get_object_or_404(
+            Quiz,
+            pk=pk,
+            user=request.user,
+        )
+        quiz.delete()
+
+        return Response(status=204)
