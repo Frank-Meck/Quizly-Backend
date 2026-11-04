@@ -1,3 +1,4 @@
+
 from django.conf import settings
 
 from rest_framework import status
@@ -5,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 
 from users.functions import create_auth_tokens
 from users.serializers import (
@@ -16,6 +18,7 @@ from users.serializers import (
 
 
 class RegisterView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -30,11 +33,19 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except AuthenticationFailed:
+            return Response(
+                {"detail": "Invalid username or password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         user = serializer.validated_data["user"]
         tokens = create_auth_tokens(user)
@@ -59,6 +70,7 @@ class LoginView(APIView):
             httponly=True,
             secure=secure_cookie,
             samesite="Lax",
+            path="/",
         )
 
         response.set_cookie(
@@ -67,6 +79,7 @@ class LoginView(APIView):
             httponly=True,
             secure=secure_cookie,
             samesite="Lax",
+            path="/",
         )
 
         return response
@@ -125,6 +138,7 @@ class LogoutView(APIView):
 
 
 class TokenRefreshView(APIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def post(self, request):

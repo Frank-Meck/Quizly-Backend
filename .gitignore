@@ -1,14 +1,160 @@
+# =====================================================
+# Quizly Backend - Git Ignore
+# Django + Python + Windows + VS Code
+# =====================================================
+
+
+# =====================================================
+# Django
+# =====================================================
+
+*.log
+*.pot
+local_settings.py
+
+# Database
+db.sqlite3
+*.sqlite3
+db.sqlite3-journal
+
+# User uploaded files
+media/
+
+# Collected static files
+staticfiles/
+static/
+
+
+# =====================================================
+# Python
+# =====================================================
+
+# Byte-compiled / optimized files
+*.py[cod]
+*$py.class
+__pycache__/
+
+# C extensions
+*.so
+
+# Python distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+
+# =====================================================
+# Virtual Environments
+# =====================================================
 
 .venv/
 venv/
+ENV/
 env/
-__pycache__/
-*.py[cod]
-db.sqlite3
-media/
-staticfiles/
+env.bak/
+venv.bak/
+
+
+# =====================================================
+# Environment Variables
+# =====================================================
+
+# Never commit secrets
 .env
+.env.*
+
+# Keep the example template
+!.env.example
+
+
+# =====================================================
+# Tests / Coverage
+# =====================================================
+
+.pytest_cache/
+.tox/
+.nox/
+.cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
+*.cover
+
+
+# =====================================================
+# IDE / Editor
+# =====================================================
+
+# Visual Studio Code
 .vscode/
+*.code-workspace
+
+# JetBrains
 .idea/
-.DS_Store
+
+
+# =====================================================
+# Operating System
+# =====================================================
+
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+*.lnk
+
+# macOS
+.DS_Store
+
+
+# =====================================================
+# Temporary files
+# =====================================================
+
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+
+# =====================================================
+# Local files / Backups
+# =====================================================
+
+uploads/
+backup/
+backups/
+secrets/
+
+
+# =====================================================
+# Documentation / Build
+# =====================================================
+
+docs/_build/
+
+
+# =====================================================
+# Docker
+# =====================================================
+
+docker-compose.override.yml

@@ -1,4 +1,3 @@
-
 from django.test import SimpleTestCase
 from unittest.mock import patch
 from quizzes.functions import get_youtube_transcript
@@ -298,7 +297,6 @@ class ValidateQuizDataTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             validate_quiz_data(quiz_data)
 
-
 class GenerateQuizDataTests(SimpleTestCase):
 
     @patch(
@@ -437,7 +435,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         mock_response.assert_called_once()
         self.assertEqual(
             mock_response.call_args.kwargs["model"],
-            "gemini-3.8-flash",
+            "gemini-3.5-flash-lite",
         )
 
     @patch("quizzes.functions.genai.Client")
@@ -604,7 +602,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         prompt = mock_response.call_args.kwargs["contents"]
 
         self.assertIn(
-            "Use simple, natural, and easy-to-understand language",
+            "Use simple, natural language",
             prompt,
         )
 
@@ -625,7 +623,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         prompt = mock_response.call_args.kwargs["contents"]
 
         self.assertIn(
-            "Do not ask the same thing in different words",
+            "Do not repeat questions",
             prompt,
         )
 
@@ -725,3 +723,166 @@ class CleanGeminiResponseTests(SimpleTestCase):
         )
 
 
+class WhisperTranscriptionTests(SimpleTestCase):
+
+    def setUp(self):
+        import quizzes.functions as quiz_functions
+
+        self.quiz_functions = quiz_functions
+        self.original_model = quiz_functions._WHISPER_MODEL
+        quiz_functions._WHISPER_MODEL = None
+
+    def tearDown(self):
+        self.quiz_functions._WHISPER_MODEL = self.original_model
+
+    @patch("quizzes.functions.whisper.load_model")
+    def test_transcribes_audio_with_base_model(self, mock_load_model):
+        mock_model = mock_load_model.return_value
+        mock_model.transcribe.return_value = {
+            "text": "  Python is a programming language.  "
+        }
+
+        result = self.quiz_functions.transcribe_audio_with_whisper(
+            "test-audio.mp3"
+        )
+
+        mock_load_model.assert_called_once_with("base")
+        mock_model.transcribe.assert_called_once_with(
+            "test-audio.mp3",
+            fp16=False,
+        )
+        self.assertEqual(result, "Python is a programming language.")
+
+    @patch("quizzes.functions.whisper.load_model")
+    def test_reuses_cached_whisper_model(self, mock_load_model):
+        mock_model = mock_load_model.return_value
+        mock_model.transcribe.return_value = {"text": "Test transcript"}
+
+        self.quiz_functions.transcribe_audio_with_whisper("first.mp3")
+        self.quiz_functions.transcribe_audio_with_whisper("second.mp3")
+
+        mock_load_model.assert_called_once_with("base")
+        self.assertEqual(mock_model.transcribe.call_count, 2)
+
+
+class YouTubeAudioFallbackTests(SimpleTestCase):
+
+    @patch("quizzes.functions.get_transcript_from_audio")
+    @patch("quizzes.functions.yt_dlp.YoutubeDL")
+    def test_uses_whisper_when_no_subtitles_are_available(
+        self,
+        mock_youtube_dl,
+        mock_get_audio_transcript,
+    ):
+        mock_instance = (
+            mock_youtube_dl.return_value.__enter__.return_value
+        )
+        mock_instance.extract_info.return_value = {
+            "subtitles": {},
+            "automatic_captions": {},
+        }
+
+        mock_get_audio_transcript.return_value = (
+            "Transcript generated with Whisper."
+        )
+
+        result = get_youtube_transcript(
+            "https://www.youtube.com/watch?v=test"
+        )
+
+        self.assertEqual(
+            result,
+            "Transcript generated with Whisper.",
+        )
+        mock_get_audio_transcript.assert_called_once()
+
+    @patch("quizzes.functions.get_transcript_from_audio")
+    @patch("quizzes.functions.download_subtitle_text")
+    @patch("quizzes.functions.yt_dlp.YoutubeDL")
+    def test_uses_whisper_when_subtitle_download_fails(
+        self,
+        mock_youtube_dl,
+        mock_download_subtitle,
+        mock_get_audio_transcript,
+    ):
+        mock_instance = (
+            mock_youtube_dl.return_value.__enter__.return_value
+        )
+        mock_instance.extract_info.return_value = {
+            "subtitles": {
+                "en": [{"url": "https://example.com/subtitles.vtt"}]
+            },
+            "automatic_captions": {},
+        }
+
+        mock_download_subtitle.side_effect = Exception(
+            "Subtitle download failed"
+        )
+        mock_get_audio_transcript.return_value = (
+            "Transcript generated with Whisper."
+        )
+
+        result = get_youtube_transcript(
+            "https://www.youtube.com/watch?v=test"
+        )
+
+        self.assertEqual(
+            result,
+            "Transcript generated with Whisper.",
+        )
+        mock_get_audio_transcript.assert_called_once()
+
+    @patch("quizzes.functions.get_transcript_from_audio")
+    @patch("quizzes.functions.yt_dlp.YoutubeDL")
+    def test_prefers_available_subtitles_over_whisper(
+        self,
+        mock_youtube_dl,
+        mock_get_audio_transcript,
+    ):
+        mock_instance = (
+            mock_youtube_dl.return_value.__enter__.return_value
+        )
+        mock_instance.extract_info.return_value = {
+            "subtitles": {
+                "en": [{"url": "https://example.com/subtitles.vtt"}]
+            },
+            "automatic_captions": {},
+        }
+
+        with patch(
+            "quizzes.functions.download_subtitle_text",
+            return_value="Subtitles are available.",
+        ):
+            result = get_youtube_transcript(
+                "https://www.youtube.com/watch?v=test"
+            )
+
+        self.assertEqual(result, "Subtitles are available.")
+        mock_get_audio_transcript.assert_not_called()
+
+
+class GenerateQuizDataErrorTests(SimpleTestCase):
+
+    @patch("quizzes.functions.generate_quiz_with_gemini")
+    @patch("quizzes.functions.get_youtube_transcript")
+    def test_rejects_invalid_quiz_returned_by_gemini(
+        self,
+        mock_get_transcript,
+        mock_generate_quiz,
+    ):
+        from quizzes.functions import generate_quiz_data
+
+        mock_get_transcript.return_value = (
+            "Python is a programming language."
+        )
+
+        mock_generate_quiz.return_value = {
+            "title": "Python Basics",
+            "description": "An introduction to Python.",
+            "questions": [],
+        }
+
+        with self.assertRaises(ValueError):
+            generate_quiz_data(
+                "https://www.youtube.com/watch?v=test"
+            )

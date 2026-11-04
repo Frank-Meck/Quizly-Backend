@@ -506,17 +506,30 @@ FFmpeg muss über die Kommandozeile erreichbar sein. Es wird von der Audioverarb
 
 ### 5. Umgebungsvariablen konfigurieren
 
-Erstelle anhand von `.env.example` eine lokale `.env`-Datei und trage dort deinen Gemini-API-Schlüssel ein.
+Erstelle anhand von `.env.example` eine lokale `.env`-Datei.
 
-Beispiel für `.env.example`:
+Windows PowerShell:
 
-```dotenv
-GEMINI_API_KEY=replace-with-your-api-key
+```powershell
+Copy-Item .env.example .env
 ```
 
-Die tatsächliche `.env`-Datei mit dem echten Schlüssel darf nicht in Git eingecheckt werden.
+Öffne anschließend die neu erstellte `.env`-Datei und trage dort deinen persönlichen Gemini-API-Schlüssel ein.
 
-Die Anwendung muss die Umgebungsvariablen zur Laufzeit laden. Dafür kann beispielsweise `python-dotenv` verwendet werden; alternativ können die Variablen direkt in der Umgebung gesetzt werden.
+Beispiel für den Inhalt der `.env`-Datei:
+
+```dotenv
+GEMINI_API_KEY=your_actual_gemini_api_key
+```
+
+Ersetze `your_actual_gemini_api_key` durch deinen echten Gemini-API-Key.
+
+**Wichtig:**
+
+- Die `.env`-Datei enthält persönliche Zugangsdaten und darf nicht in Git eingecheckt werden.
+- Die `.env.example`-Datei dient als Vorlage und bleibt im Repository erhalten.
+- Der echte API-Key darf niemals in die `.env.example`-Datei eingetragen werden.
+- Die Anwendung muss die Umgebungsvariablen zur Laufzeit laden. Dafür kann beispielsweise `python-dotenv` verwendet werden; alternativ können die Variablen direkt in der Umgebung gesetzt werden.
 
 ### 6. Datenbank vorbereiten
 

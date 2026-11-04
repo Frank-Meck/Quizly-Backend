@@ -94,6 +94,10 @@ class LoginTests(APITestCase):
             format="json",
         )
 
+        print("STATUS:", response.status_code)
+        print("DATA:", response.data)
+        print("CONTENT:", response.content)
+
         self.assertEqual(response.status_code, 401)
         self.assertEqual(
             response.json(),
