@@ -17,6 +17,7 @@ from google import genai
 _WHISPER_MODEL = None
 
 
+
 def validate_quiz_data(quiz_data):
     if not isinstance(quiz_data, dict):
         raise ValueError("Quiz data must be a dictionary.")
@@ -41,14 +42,7 @@ def validate_quiz_data(quiz_data):
             "Quiz data must contain exactly ten questions."
         )
 
-    question_titles = [
-        question.get("question_title")
-        for question in questions
-        if isinstance(question, dict)
-    ]
-
-    if len(question_titles) != len(set(question_titles)):
-        raise ValueError("Quiz questions must be unique.")
+    question_titles = []
 
     for question in questions:
         if not isinstance(question, dict):
@@ -56,11 +50,15 @@ def validate_quiz_data(quiz_data):
                 "Each question must be a dictionary."
             )
 
-        if not isinstance(question.get("question_title"), str):
+        question_title = question.get("question_title")
+
+        if not isinstance(question_title, str) or not question_title.strip():
             raise ValueError("Each question must have a title.")
 
-        if not question["question_title"].strip():
-            raise ValueError("Each question must have a title.")
+        if question_title in question_titles:
+            raise ValueError("Quiz questions must be unique.")
+
+        question_titles.append(question_title)
 
         options = question.get("question_options")
 
@@ -88,6 +86,7 @@ def validate_quiz_data(quiz_data):
             raise ValueError(
                 "The answer must be one of the options."
             )
+
 
 
 def clean_gemini_response(response):

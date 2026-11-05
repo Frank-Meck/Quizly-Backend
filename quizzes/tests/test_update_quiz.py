@@ -128,3 +128,30 @@ class UpdateQuizTests(APITestCase):
             quiz.video_url,
             "https://www.youtube.com/watch?v=example",
         )
+
+    def test_update_quiz_accepts_valid_youtube_url(self):
+        user = User.objects.create_user(
+            username="quiz_owner",
+            password="StrongPass123!",
+        )
+        quiz = Quiz.objects.create(
+            user=user,
+            title="Python Basics",
+            description="Python description.",
+            video_url="https://www.youtube.com/watch?v=example",
+        )
+        self.client.force_authenticate(user=user)
+
+        new_video_url = "https://youtu.be/newvideo"
+
+        response = self.client.patch(
+            f"/api/quizzes/{quiz.id}/",
+            {"video_url": new_video_url},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["video_url"], new_video_url)
+
+        quiz.refresh_from_db()
+        self.assertEqual(quiz.video_url, new_video_url)

@@ -30,6 +30,20 @@ class LogoutTests(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    def test_logout_without_refresh_token_returns_401(self):
+        self.client.cookies["access_token"] = self.access_token
+
+        response = self.client.post("/api/logout/")
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+        self.assertEqual(
+            response.data["detail"],
+            "Refresh token is missing.",
+        )
+
     def test_successful_logout_blacklists_refresh_token_and_deletes_cookies(self):
         self.client.cookies["access_token"] = self.access_token
         self.client.cookies["refresh_token"] = self.refresh_token
