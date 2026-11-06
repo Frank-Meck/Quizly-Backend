@@ -1,4 +1,6 @@
 
+"""Test quiz serialization and retrieval through the API."""
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
@@ -10,8 +12,10 @@ User = get_user_model()
 
 
 class GetQuizSerializerTests(APITestCase):
+    """Test serialization of quizzes and their associated questions."""
 
     def test_quiz_serializer_includes_questions(self):
+        """Include associated questions in the serialized quiz."""
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",
@@ -45,8 +49,10 @@ class GetQuizSerializerTests(APITestCase):
 
 
 class GetQuizTests(APITestCase):
+    """Test retrieving individual quizzes through the API."""
 
     def test_user_can_retrieve_own_quiz(self):
+        """Allow users to retrieve their own quizzes."""
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",
@@ -68,8 +74,8 @@ class GetQuizTests(APITestCase):
             "An introduction to Python.",
         )
 
-
     def test_user_cannot_retrieve_another_users_quiz(self):
+        """Prevent users from retrieving quizzes owned by others."""
         owner = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",
@@ -91,6 +97,7 @@ class GetQuizTests(APITestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_unauthenticated_user_cannot_retrieve_quiz(self):
+        """Require authentication before retrieving a quiz."""
         user = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",
@@ -105,3 +112,15 @@ class GetQuizTests(APITestCase):
         response = self.client.get(f"/api/quizzes/{quiz.id}/")
 
         self.assertEqual(response.status_code, 401)
+
+    def test_user_cannot_retrieve_nonexistent_quiz(self):
+        """Return 404 when the requested quiz does not exist."""
+        user = User.objects.create_user(
+            username="quiz_user",
+            password="StrongPass123!",
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get("/api/quizzes/999999/")
+
+        self.assertEqual(response.status_code, 404)

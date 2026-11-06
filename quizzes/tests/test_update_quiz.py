@@ -1,3 +1,6 @@
+
+"""Test updating quizzes through the API."""
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
@@ -8,8 +11,10 @@ User = get_user_model()
 
 
 class UpdateQuizTests(APITestCase):
+    """Test updating quizzes belonging to the authenticated user."""
 
     def test_user_can_partially_update_own_quiz(self):
+        """Allow users to update quiz fields without replacing questions."""
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",
@@ -55,6 +60,7 @@ class UpdateQuizTests(APITestCase):
         self.assertEqual(quiz.description, "Updated description.")
 
     def test_user_cannot_update_another_users_quiz(self):
+        """Prevent users from updating quizzes owned by others."""
         owner = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",
@@ -83,6 +89,7 @@ class UpdateQuizTests(APITestCase):
         self.assertEqual(quiz.title, "Private Quiz")
 
     def test_unauthenticated_user_cannot_update_quiz(self):
+        """Require authentication before updating a quiz."""
         user = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",
@@ -103,6 +110,7 @@ class UpdateQuizTests(APITestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_update_quiz_rejects_invalid_video_url(self):
+        """Reject video URLs that do not belong to YouTube."""
         user = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",
@@ -130,6 +138,7 @@ class UpdateQuizTests(APITestCase):
         )
 
     def test_update_quiz_accepts_valid_youtube_url(self):
+        """Allow updates with valid YouTube URLs."""
         user = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",

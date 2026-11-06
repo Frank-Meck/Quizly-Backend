@@ -1,3 +1,6 @@
+
+"""Test deleting quizzes through the API."""
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
@@ -8,8 +11,10 @@ User = get_user_model()
 
 
 class DeleteQuizTests(APITestCase):
+    """Test quiz deletion and ownership permissions."""
 
     def test_user_can_delete_own_quiz(self):
+        """Allow users to delete their own quizzes and questions."""
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",
@@ -43,6 +48,7 @@ class DeleteQuizTests(APITestCase):
         )
 
     def test_user_cannot_delete_another_users_quiz(self):
+        """Prevent users from deleting quizzes owned by others."""
         owner = User.objects.create_user(
             username="quiz_owner",
             password="StrongPass123!",
@@ -65,6 +71,7 @@ class DeleteQuizTests(APITestCase):
         self.assertTrue(Quiz.objects.filter(id=quiz.id).exists())
 
     def test_unauthenticated_user_cannot_delete_quiz(self):
+        """Require authentication before deleting a quiz."""
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",
@@ -82,6 +89,7 @@ class DeleteQuizTests(APITestCase):
         self.assertTrue(Quiz.objects.filter(id=quiz.id).exists())
 
     def test_delete_nonexistent_quiz_returns_404(self):
+        """Return 404 when the requested quiz does not exist."""
         user = User.objects.create_user(
             username="quiz_user",
             password="StrongPass123!",

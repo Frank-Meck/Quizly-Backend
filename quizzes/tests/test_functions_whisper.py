@@ -1,28 +1,37 @@
+
+"""Test Whisper transcription and YouTube audio processing."""
+
+import shutil
 from unittest.mock import patch
+
+import requests
 from django.test import SimpleTestCase
+
+import quizzes.functions as quiz_functions
 from quizzes.functions import get_youtube_transcript
 
 
 class WhisperTranscriptionTests(SimpleTestCase):
+    """Test audio transcription using the Whisper model."""
 
     def setUp(self):
-        import quizzes.functions as quiz_functions
-
-        self.quiz_functions = quiz_functions
+        """Reset the cached Whisper model before each test."""
         self.original_model = quiz_functions._WHISPER_MODEL
         quiz_functions._WHISPER_MODEL = None
 
     def tearDown(self):
-        self.quiz_functions._WHISPER_MODEL = self.original_model
+        """Restore the original cached Whisper model."""
+        quiz_functions._WHISPER_MODEL = self.original_model
 
     @patch("quizzes.functions.whisper.load_model")
     def test_transcribes_audio_with_base_model(self, mock_load_model):
+        """Load the base model and return the cleaned transcript."""
         mock_model = mock_load_model.return_value
         mock_model.transcribe.return_value = {
             "text": "  Python is a programming language.  "
         }
 
-        result = self.quiz_functions.transcribe_audio_with_whisper(
+        result = quiz_functions.transcribe_audio_with_whisper(
             "test-audio.mp3"
         )
 
@@ -35,35 +44,38 @@ class WhisperTranscriptionTests(SimpleTestCase):
 
     @patch("quizzes.functions.whisper.load_model")
     def test_reuses_cached_whisper_model(self, mock_load_model):
+        """Reuse the loaded model for subsequent transcriptions."""
         mock_model = mock_load_model.return_value
-        mock_model.transcribe.return_value = {"text": "Test transcript"}
+        mock_model.transcribe.return_value = {
+            "text": "Test transcript"
+        }
 
-        self.quiz_functions.transcribe_audio_with_whisper("first.mp3")
-        self.quiz_functions.transcribe_audio_with_whisper("second.mp3")
+        quiz_functions.transcribe_audio_with_whisper("first.mp3")
+        quiz_functions.transcribe_audio_with_whisper("second.mp3")
 
         mock_load_model.assert_called_once_with("base")
         self.assertEqual(mock_model.transcribe.call_count, 2)
-
 
     @patch("quizzes.functions.whisper.load_model")
     def test_raises_error_when_transcription_is_empty(
         self,
         mock_load_model,
     ):
+        """Raise an error when Whisper returns an empty transcript."""
         mock_model = mock_load_model.return_value
-        mock_model.transcribe.return_value = {
-            "text": "   "
-        }
+        mock_model.transcribe.return_value = {"text": "   "}
 
         with self.assertRaisesMessage(
             ValueError,
             "Whisper could not generate a transcript.",
         ):
-            self.quiz_functions.transcribe_audio_with_whisper(
+            quiz_functions.transcribe_audio_with_whisper(
                 "test-audio.mp3"
             )
 
+
 class YouTubeAudioFallbackTests(SimpleTestCase):
+    """Test fallback to Whisper when YouTube subtitles are unavailable."""
 
     @patch("quizzes.functions.get_transcript_from_audio")
     @patch("quizzes.functions.yt_dlp.YoutubeDL")
@@ -72,6 +84,7 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
         mock_youtube_dl,
         mock_get_audio_transcript,
     ):
+        """Use Whisper when no subtitles are available."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
@@ -79,7 +92,6 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
             "subtitles": {},
             "automatic_captions": {},
         }
-
         mock_get_audio_transcript.return_value = (
             "Transcript generated with Whisper."
         )
@@ -103,16 +115,16 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
         mock_download_subtitle,
         mock_get_audio_transcript,
     ):
+        """Use Whisper when downloading subtitles fails."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
         mock_instance.extract_info.return_value = {
             "subtitles": {
-                "en": [{"url": "https://example.com/subtitles.vtt"}]
+                "en": [{"url": "https://example.com/subtitles.vtt"}],
             },
             "automatic_captions": {},
         }
-
         mock_download_subtitle.side_effect = Exception(
             "Subtitle download failed"
         )
@@ -130,7 +142,6 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
         )
         mock_get_audio_transcript.assert_called_once()
 
-
     @patch("quizzes.functions.get_transcript_from_audio")
     @patch("quizzes.functions.download_subtitle_text")
     @patch("quizzes.functions.yt_dlp.YoutubeDL")
@@ -140,18 +151,16 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
         mock_download_subtitle,
         mock_get_audio_transcript,
     ):
-        import requests
-
+        """Use Whisper when the subtitle request raises an error."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
         mock_instance.extract_info.return_value = {
             "subtitles": {
-                "en": [{"url": "https://example.com/subtitles.vtt"}]
+                "en": [{"url": "https://example.com/subtitles.vtt"}],
             },
             "automatic_captions": {},
         }
-
         mock_download_subtitle.side_effect = requests.RequestException(
             "Network error"
         )
@@ -169,7 +178,6 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
         )
         mock_get_audio_transcript.assert_called_once()
 
-
     @patch("quizzes.functions.get_transcript_from_audio")
     @patch("quizzes.functions.yt_dlp.YoutubeDL")
     def test_prefers_available_subtitles_over_whisper(
@@ -177,12 +185,13 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
         mock_youtube_dl,
         mock_get_audio_transcript,
     ):
+        """Prefer available subtitles instead of transcribing audio."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
         mock_instance.extract_info.return_value = {
             "subtitles": {
-                "en": [{"url": "https://example.com/subtitles.vtt"}]
+                "en": [{"url": "https://example.com/subtitles.vtt"}],
             },
             "automatic_captions": {},
         }
@@ -200,6 +209,7 @@ class YouTubeAudioFallbackTests(SimpleTestCase):
 
 
 class AudioDownloadTests(SimpleTestCase):
+    """Test downloading and validating YouTube audio files."""
 
     @patch("quizzes.functions.Path.is_file", return_value=True)
     @patch("quizzes.functions.yt_dlp.YoutubeDL")
@@ -213,8 +223,7 @@ class AudioDownloadTests(SimpleTestCase):
         mock_youtube_dl,
         mock_is_file,
     ):
-        import quizzes.functions as quiz_functions
-
+        """Return the requested audio filepath after downloading."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
@@ -247,8 +256,7 @@ class AudioDownloadTests(SimpleTestCase):
         mock_youtube_dl,
         mock_is_file,
     ):
-        import quizzes.functions as quiz_functions
-
+        """Use the prepared filename when no filepath is provided."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
@@ -281,8 +289,7 @@ class AudioDownloadTests(SimpleTestCase):
         mock_youtube_dl,
         mock_rmtree,
     ):
-        import quizzes.functions as quiz_functions
-
+        """Remove temporary files when the download fails."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
@@ -317,8 +324,7 @@ class AudioDownloadTests(SimpleTestCase):
         mock_is_file,
         mock_rmtree,
     ):
-        import quizzes.functions as quiz_functions
-
+        """Raise an error when the downloaded file is missing."""
         mock_instance = (
             mock_youtube_dl.return_value.__enter__.return_value
         )
@@ -344,6 +350,7 @@ class AudioDownloadTests(SimpleTestCase):
 
 
 class AudioTranscriptTests(SimpleTestCase):
+    """Test transcription and cleanup of downloaded audio."""
 
     @patch("shutil.rmtree")
     @patch("quizzes.functions.transcribe_audio_with_whisper")
@@ -354,8 +361,7 @@ class AudioTranscriptTests(SimpleTestCase):
         mock_transcribe,
         mock_rmtree,
     ):
-        import quizzes.functions as quiz_functions
-
+        """Transcribe downloaded audio and remove temporary files."""
         mock_download.return_value = (
             "test-audio.mp3",
             "test-temp-dir",
@@ -367,9 +373,7 @@ class AudioTranscriptTests(SimpleTestCase):
         )
 
         self.assertEqual(result, "Test transcript")
-        mock_transcribe.assert_called_once_with(
-            "test-audio.mp3"
-        )
+        mock_transcribe.assert_called_once_with("test-audio.mp3")
         mock_rmtree.assert_called_once_with(
             "test-temp-dir",
             ignore_errors=True,
@@ -384,8 +388,7 @@ class AudioTranscriptTests(SimpleTestCase):
         mock_transcribe,
         mock_rmtree,
     ):
-        import quizzes.functions as quiz_functions
-
+        """Remove temporary files when transcription fails."""
         mock_download.return_value = (
             "test-audio.mp3",
             "test-temp-dir",
