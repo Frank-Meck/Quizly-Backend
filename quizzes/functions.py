@@ -10,6 +10,8 @@ import requests
 import yt_dlp
 import whisper
 from google import genai
+from google.genai import errors
+import time
 
 
 # Whisper-Modell zwischenspeichern
@@ -109,6 +111,7 @@ def clean_gemini_response(response):
     return response.strip()
 
 
+
 def generate_quiz_with_gemini(transcript):
 
     client = genai.Client(
@@ -159,14 +162,26 @@ Transcript:
 {transcript}
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash-lite",
-        contents=prompt,
-    )
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.5-flash-lite",
+                contents=prompt,
+            )
 
-    cleaned_response = clean_gemini_response(response.text)
+            cleaned_response = clean_gemini_response(
+                response.text
+            )
 
-    return json.loads(cleaned_response)
+            return json.loads(cleaned_response)
+
+        except errors.ServerError as error:
+            if error.code == 503 and attempt < 2:
+                time.sleep(2)
+                continue
+
+            raise
+
 
 
 def generate_quiz_data(url):
