@@ -1,5 +1,16 @@
+
+"""Test Gemini quiz generation and response handling."""
+
 from unittest.mock import patch
+
 from django.test import SimpleTestCase
+
+
+class MockServerError(Exception):
+    """Simulate a Gemini server error with an HTTP status code."""
+
+    def __init__(self, code):
+        self.code = code
 
 
 class GenerateQuizDataTests(SimpleTestCase):
@@ -17,9 +28,12 @@ class GenerateQuizDataTests(SimpleTestCase):
         mock_generate_quiz,
         mock_get_transcript,
     ):
+        """Generate and validate quiz data from a video transcript."""
         from quizzes.functions import generate_quiz_data
 
-        mock_get_transcript.return_value = "Python is a programming language."
+        mock_get_transcript.return_value = (
+            "Python is a programming language."
+        )
         mock_generate_quiz.return_value = {
             "title": "Python Basics",
             "description": "An introduction to Python.",
@@ -38,7 +52,9 @@ class GenerateQuizDataTests(SimpleTestCase):
             ],
         }
 
-        result = generate_quiz_data("https://www.youtube.com/watch?v=test")
+        result = generate_quiz_data(
+            "https://www.youtube.com/watch?v=test"
+        )
 
         self.assertEqual(result["title"], "Python Basics")
         mock_get_transcript.assert_called_once_with(
@@ -50,6 +66,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 
     @patch("quizzes.functions.genai.Client")
     def test_generates_quiz_from_transcript(self, mock_client):
+        """Generate quiz data from a transcript."""
         from quizzes.functions import generate_quiz_with_gemini
 
         transcript = "Python is a programming language."
@@ -59,7 +76,9 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             "questions": [],
         }
 
-        mock_response = mock_client.return_value.models.generate_content
+        mock_response = (
+            mock_client.return_value.models.generate_content
+        )
         mock_response.return_value.text = (
             '{"title": "Python Basics", '
             '"description": "An introduction to Python.", '
@@ -77,6 +96,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 
     @patch("quizzes.functions.genai.Client")
     def test_parses_markdown_json_response(self, mock_client):
+        """Parse JSON returned inside a Markdown code block."""
         from quizzes.functions import generate_quiz_with_gemini
 
         transcript = "Python is a programming language."
@@ -95,18 +115,107 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 
         self.assertEqual(result, expected_quiz)
 
-
-
+    @patch("quizzes.functions.time.sleep")
+    @patch(
+        "quizzes.functions.errors.ServerError",
+        MockServerError,
+    )
     @patch("quizzes.functions.genai.Client")
-    def test_includes_transcript_in_prompt(self, mock_client):
+    def test_retries_after_temporary_server_error(
+        self,
+        mock_client,
+        mock_sleep,
+    ):
+        """Retry after a 503 error and return the successful response."""
         from quizzes.functions import generate_quiz_with_gemini
-
-        transcript = "Python supports object-oriented programming."
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.side_effect = [
+            MockServerError(503),
+            type(
+                "Response",
+                (),
+                {"text": '{"title": "Python Basics"}'},
+            )(),
+        ]
+
+        result = generate_quiz_with_gemini("Python transcript")
+
+        self.assertEqual(result, {"title": "Python Basics"})
+        self.assertEqual(mock_response.call_count, 2)
+        mock_sleep.assert_called_once_with(2)
+
+    @patch("quizzes.functions.time.sleep")
+    @patch(
+        "quizzes.functions.errors.ServerError",
+        MockServerError,
+    )
+    @patch("quizzes.functions.genai.Client")
+    def test_raises_error_after_three_failed_attempts(
+        self,
+        mock_client,
+        mock_sleep,
+    ):
+        """Raise the server error after three unsuccessful attempts."""
+        from quizzes.functions import generate_quiz_with_gemini
+
+        mock_response = (
+            mock_client.return_value.models.generate_content
+        )
+        mock_response.side_effect = [
+            MockServerError(503),
+            MockServerError(503),
+            MockServerError(503),
+        ]
+
+        with self.assertRaises(MockServerError):
+            generate_quiz_with_gemini("Python transcript")
+
+        self.assertEqual(mock_response.call_count, 3)
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch("quizzes.functions.time.sleep")
+    @patch(
+        "quizzes.functions.errors.ServerError",
+        MockServerError,
+    )
+    @patch("quizzes.functions.genai.Client")
+    def test_does_not_retry_non_503_server_error(
+        self,
+        mock_client,
+        mock_sleep,
+    ):
+        """Do not retry server errors other than HTTP 503."""
+        from quizzes.functions import generate_quiz_with_gemini
+
+        mock_response = (
+            mock_client.return_value.models.generate_content
+        )
+        mock_response.side_effect = MockServerError(500)
+
+        with self.assertRaises(MockServerError):
+            generate_quiz_with_gemini("Python transcript")
+
+        mock_response.assert_called_once()
+        mock_sleep.assert_not_called()
+
+    @patch("quizzes.functions.genai.Client")
+    def test_includes_transcript_in_prompt(self, mock_client):
+        """Include the transcript in the Gemini prompt."""
+        from quizzes.functions import generate_quiz_with_gemini
+
+        transcript = (
+            "Python supports object-oriented programming."
+        )
+
+        mock_response = (
+            mock_client.return_value.models.generate_content
+        )
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
         generate_quiz_with_gemini(transcript)
 
@@ -114,21 +223,24 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 
         self.assertIn(transcript, prompt)
 
-
-
     @patch("quizzes.functions.genai.Client")
     def test_prompt_requires_transcript_only_information(
         self,
         mock_client,
     ):
+        """Require the quiz to use only transcript information."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -137,20 +249,24 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-
     @patch("quizzes.functions.genai.Client")
     def test_prompt_requires_questions_about_different_aspects(
         self,
         mock_client,
     ):
+        """Require questions about different transcript aspects."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -164,14 +280,19 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self,
         mock_client,
     ):
+        """Require plausible but incorrect answer options."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -180,20 +301,24 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-
     @patch("quizzes.functions.genai.Client")
     def test_prompt_requires_mixed_difficulty_levels(
         self,
         mock_client,
     ):
+        """Require the specified distribution of difficulty levels."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -206,14 +331,19 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self,
         mock_client,
     ):
+        """Require clear and unambiguous questions."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -227,14 +357,19 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self,
         mock_client,
     ):
+        """Require simple and natural language."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -248,14 +383,19 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self,
         mock_client,
     ):
+        """Prevent repeated question content."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -269,14 +409,19 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self,
         mock_client,
     ):
+        """Require the quiz to use the transcript language."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python ist eine Programmiersprache.")
+        generate_quiz_with_gemini(
+            "Python ist eine Programmiersprache."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -290,14 +435,19 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self,
         mock_client,
     ):
+        """Require a concise and relevant quiz title."""
         from quizzes.functions import generate_quiz_with_gemini
 
         mock_response = (
             mock_client.return_value.models.generate_content
         )
-        mock_response.return_value.text = '{"title": "Python Basics"}'
+        mock_response.return_value.text = (
+            '{"title": "Python Basics"}'
+        )
 
-        generate_quiz_with_gemini("Python is a programming language.")
+        generate_quiz_with_gemini(
+            "Python is a programming language."
+        )
 
         prompt = mock_response.call_args.kwargs["contents"]
 
@@ -310,6 +460,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 class CleanGeminiResponseTests(SimpleTestCase):
 
     def test_removes_json_markdown_code_block(self):
+        """Remove JSON Markdown code fences."""
         from quizzes.functions import clean_gemini_response
 
         response = (
@@ -326,6 +477,7 @@ class CleanGeminiResponseTests(SimpleTestCase):
         )
 
     def test_removes_plain_markdown_code_block(self):
+        """Remove plain Markdown code fences."""
         from quizzes.functions import clean_gemini_response
 
         response = (
@@ -342,6 +494,7 @@ class CleanGeminiResponseTests(SimpleTestCase):
         )
 
     def test_parses_cleaned_json_response(self):
+        """Parse JSON after removing Markdown code fences."""
         import json
 
         from quizzes.functions import clean_gemini_response
@@ -370,6 +523,7 @@ class GenerateQuizDataErrorTests(SimpleTestCase):
         mock_get_transcript,
         mock_generate_quiz,
     ):
+        """Reject invalid quiz data returned by Gemini."""
         from quizzes.functions import generate_quiz_data
 
         mock_get_transcript.return_value = (

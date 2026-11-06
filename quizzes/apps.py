@@ -1,5 +1,10 @@
+
+"""Configure the quizzes application."""
+
 from django.apps import AppConfig
 
 
 class QuizzesConfig(AppConfig):
-    name = 'quizzes'
+    """Configure the quizzes app."""
+
+    name = "quizzes"
