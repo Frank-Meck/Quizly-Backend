@@ -86,6 +86,8 @@ class QuestionSerializer(serializers.ModelSerializer):
             "question_title",
             "question_options",
             "answer",
+            "created_at",
+            "updated_at",
         ]
 
 
@@ -132,6 +134,8 @@ class QuizSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "created_at",
+            "updated_at",
             "video_url",
             "questions",
         ]
