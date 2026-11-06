@@ -1,15 +1,16 @@
 
+"""Define URL routes for the Quizly API and Django admin."""
+
 from django.contrib import admin
 from django.urls import path
 
+from quizzes.views import CreateQuizView, GetQuizView
 from users.views import (
     LoginView,
     LogoutView,
     RegisterView,
     TokenRefreshView,
 )
-
-from quizzes.views import CreateQuizView, GetQuizView
 
 
 urlpatterns = [
