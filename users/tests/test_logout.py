@@ -1,3 +1,4 @@
+
 from django.contrib.auth import get_user_model
 
 from rest_framework import status
@@ -7,11 +8,15 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
 from users.serializers import LogoutSerializer
 
+
 User = get_user_model()
 
 
 class LogoutTests(APITestCase):
+    """Test the user logout API."""
+
     def setUp(self):
+        """Create a user and generate authentication tokens."""
         self.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
@@ -23,6 +28,7 @@ class LogoutTests(APITestCase):
         self.refresh_token = str(self.refresh)
 
     def test_logout_without_authentication_returns_401(self):
+        """Reject logout requests without authentication."""
         response = self.client.post("/api/logout/")
 
         self.assertEqual(
@@ -31,6 +37,7 @@ class LogoutTests(APITestCase):
         )
 
     def test_logout_without_refresh_token_returns_401(self):
+        """Reject logout requests without a refresh token."""
         self.client.cookies["access_token"] = self.access_token
 
         response = self.client.post("/api/logout/")
@@ -44,7 +51,10 @@ class LogoutTests(APITestCase):
             "Refresh token is missing.",
         )
 
-    def test_successful_logout_blacklists_refresh_token_and_deletes_cookies(self):
+    def test_successful_logout_blacklists_refresh_token_and_deletes_cookies(
+        self,
+    ):
+        """Blacklist the refresh token and clear authentication cookies."""
         self.client.cookies["access_token"] = self.access_token
         self.client.cookies["refresh_token"] = self.refresh_token
 
@@ -59,10 +69,12 @@ class LogoutTests(APITestCase):
         )
 
         for cookie_name in ("access_token", "refresh_token"):
-            self.assertEqual(response.cookies[cookie_name].value, "")
-            self.assertEqual(response.cookies[cookie_name]["max-age"], 0)
+            cookie = response.cookies[cookie_name]
+            self.assertEqual(cookie.value, "")
+            self.assertEqual(cookie["max-age"], 0)
 
     def test_logout_with_invalid_refresh_token_returns_401(self):
+        """Reject logout requests with an invalid refresh token."""
         self.client.cookies["access_token"] = self.access_token
         self.client.cookies["refresh_token"] = "invalid-refresh-token"
 
@@ -75,8 +87,10 @@ class LogoutTests(APITestCase):
 
 
 class LogoutSerializerTests(APITestCase):
+    """Test the logout serializer."""
 
     def test_logout_serializer_accepts_valid_refresh_token(self):
+        """Accept a valid refresh token."""
         user = User.objects.create_user(
             username="logout_user",
             email="logout@example.com",
@@ -92,6 +106,7 @@ class LogoutSerializerTests(APITestCase):
         self.assertTrue(serializer.is_valid())
 
     def test_logout_serializer_rejects_invalid_refresh_token(self):
+        """Reject an invalid refresh token."""
         serializer = LogoutSerializer(
             data={"refresh_token": "invalid-refresh-token"}
         )

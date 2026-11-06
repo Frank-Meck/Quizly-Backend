@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class UsersConfig(AppConfig):
-    name = 'users'
+    """Configure the users application."""
+
+    name = "users"

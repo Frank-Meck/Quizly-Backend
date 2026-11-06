@@ -1,4 +1,3 @@
-
 from django.contrib.auth import get_user_model
 
 from rest_framework.test import APITestCase
@@ -10,8 +9,10 @@ User = get_user_model()
 
 
 class RegisterTests(APITestCase):
+    """Test the user registration API."""
 
     def test_register_creates_user(self):
+        """Create a user through the registration endpoint."""
         response = self.client.post(
             "/api/register/",
             {
@@ -26,12 +27,11 @@ class RegisterTests(APITestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(
             response.json(),
-            {
-                "detail": "User created successfully!"
-            },
+            {"detail": "User created successfully!"},
         )
 
     def test_register_rejects_missing_fields(self):
+        """Reject registration requests with missing fields."""
         response = self.client.post(
             "/api/register/",
             {},
@@ -41,6 +41,7 @@ class RegisterTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_register_rejects_password_mismatch(self):
+        """Reject registration when passwords do not match."""
         response = self.client.post(
             "/api/register/",
             {
@@ -55,6 +56,7 @@ class RegisterTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_register_rejects_duplicate_email(self):
+        """Reject registration with an already registered email."""
         User.objects.create_user(
             username="existing_user",
             email="quiz@example.com",
@@ -75,6 +77,7 @@ class RegisterTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_register_rejects_duplicate_username(self):
+        """Reject registration with an existing username."""
         User.objects.create_user(
             username="existing_user",
             email="existing@example.com",
@@ -95,14 +98,15 @@ class RegisterTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            {
-                "username": ["Username is already taken."]
-            },
+            {"username": ["Username is already taken."]},
         )
 
+
 class RegisterSerializerTests(APITestCase):
+    """Test the registration serializer."""
 
     def test_register_serializer_accepts_valid_data(self):
+        """Accept valid registration data."""
         serializer = RegisterSerializer(
             data={
                 "username": "quiz_user",
@@ -114,8 +118,8 @@ class RegisterSerializerTests(APITestCase):
 
         self.assertTrue(serializer.is_valid())
 
-
     def test_register_serializer_rejects_password_mismatch(self):
+        """Reject registration data with mismatched passwords."""
         serializer = RegisterSerializer(
             data={
                 "username": "quiz_user",
@@ -129,6 +133,7 @@ class RegisterSerializerTests(APITestCase):
         self.assertIn("confirmed_password", serializer.errors)
 
     def test_register_serializer_rejects_duplicate_email(self):
+        """Reject an email address that is already registered."""
         User.objects.create_user(
             username="existing_user",
             email="quiz@example.com",
@@ -148,6 +153,7 @@ class RegisterSerializerTests(APITestCase):
         self.assertIn("email", serializer.errors)
 
     def test_register_serializer_rejects_duplicate_username(self):
+        """Reject a username that is already registered."""
         User.objects.create_user(
             username="existing_user",
             email="existing@example.com",
@@ -167,6 +173,7 @@ class RegisterSerializerTests(APITestCase):
         self.assertIn("username", serializer.errors)
 
     def test_register_serializer_creates_user(self):
+        """Create a user with correctly hashed credentials."""
         serializer = RegisterSerializer(
             data={
                 "username": "new_quiz_user",
@@ -181,13 +188,13 @@ class RegisterSerializerTests(APITestCase):
 
         self.assertEqual(user.username, "new_quiz_user")
         self.assertEqual(user.email, "new_quiz@example.com")
-        self.assertTrue(
-            user.check_password("StrongPass123!")
-        )
+        self.assertTrue(user.check_password("StrongPass123!"))
 
-    def test_register_serializer_password_is_write_only(self):
+    def test_register_serializer_password_fields_are_write_only(self):
+        """Ensure password fields are excluded from output."""
         serializer = RegisterSerializer()
 
+        self.assertTrue(serializer.fields["password"].write_only)
         self.assertTrue(
-            serializer.fields["password"].write_only
+            serializer.fields["confirmed_password"].write_only
         )

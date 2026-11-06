@@ -1,118 +1,119 @@
-from django.contrib.auth import authenticate, get_user_model
-
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from users.functions import (
+    authenticate_user,
+    create_registered_user,
+    validate_unique_email,
+    validate_unique_username,
+)
+
 
 class RegisterSerializer(serializers.Serializer):
+    """Validate registration data and create new users."""
+
     username = serializers.CharField()
     email = serializers.EmailField()
     password = serializers.CharField(
         write_only=True,
+        trim_whitespace=False,
     )
-    confirmed_password = serializers.CharField()
+    confirmed_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False,
+    )
 
     def validate(self, data):
+        """Check whether both password fields match."""
         if data["password"] != data["confirmed_password"]:
             raise serializers.ValidationError(
-                {
-                    "confirmed_password": "Passwords do not match."
-                }
+                {"confirmed_password": "Passwords do not match."}
             )
-
         return data
 
     def validate_email(self, value):
-        user_model = get_user_model()
-
-        if user_model.objects.filter(email__iexact=value).exists():
+        """Check whether the email address is available."""
+        if validate_unique_email(value):
             raise serializers.ValidationError(
                 "Email is already registered."
             )
-
         return value
 
     def validate_username(self, value):
-        user_model = get_user_model()
-
-        if user_model.objects.filter(username=value).exists():
+        """Check whether the username is available."""
+        if validate_unique_username(value):
             raise serializers.ValidationError(
                 "Username is already taken."
             )
-
         return value
 
     def create(self, validated_data):
+        """Create a user after removing the confirmation field."""
         validated_data.pop("confirmed_password")
-
-        user_model = get_user_model()
-
-        return user_model.objects.create_user(
-            **validated_data
-        )
+        return create_registered_user(validated_data)
 
 
 class LoginSerializer(serializers.Serializer):
+    """Validate login credentials and retrieve the user."""
+
     username = serializers.CharField()
     password = serializers.CharField(
         write_only=True,
+        trim_whitespace=False,
     )
 
     def validate(self, data):
-        user = authenticate(
-            username=data["username"],
-            password=data["password"],
+        """Authenticate the submitted username and password."""
+        user = authenticate_user(
+            data["username"],
+            data["password"],
         )
-
         if user is None:
             raise AuthenticationFailed(
                 "Invalid username or password."
             )
-
         data["user"] = user
         return data
 
 
 class LogoutSerializer(serializers.Serializer):
-    refresh_token = serializers.CharField(
-        write_only=True,
-    )
+    """Validate and blacklist a refresh token."""
+
+    refresh_token = serializers.CharField(write_only=True)
 
     def validate_refresh_token(self, value):
+        """Validate the submitted refresh token."""
         try:
-            token = RefreshToken(value)
-        except TokenError:
+            return RefreshToken(value)
+        except TokenError as exc:
             raise serializers.ValidationError(
                 "Refresh token is invalid."
-            )
-
-        return token
+            ) from exc
 
     def save(self, **kwargs):
+        """Blacklist the validated refresh token."""
         token = self.validated_data["refresh_token"]
         token.blacklist()
-
         return token
 
 
 class TokenRefreshSerializer(serializers.Serializer):
-    refresh_token = serializers.CharField(
-        write_only=True,
-    )
+    """Validate a refresh token and generate a new access token."""
+
+    refresh_token = serializers.CharField(write_only=True)
 
     def validate_refresh_token(self, value):
+        """Validate the submitted refresh token."""
         try:
             return RefreshToken(value)
-        except TokenError:
+        except TokenError as exc:
             raise serializers.ValidationError(
                 "Refresh token is invalid."
-            )
+            ) from exc
 
     def validate(self, data):
+        """Generate a new access token from the refresh token."""
         token = data["refresh_token"]
-
-        return {
-            "access_token": str(token.access_token),
-        }
+        return {"access_token": str(token.access_token)}

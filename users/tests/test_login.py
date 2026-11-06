@@ -1,9 +1,8 @@
-
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 
-from rest_framework.test import APITestCase
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.test import APITestCase
 
 from users.serializers import LoginSerializer
 
@@ -12,9 +11,11 @@ User = get_user_model()
 
 
 class LoginTests(APITestCase):
+    """Test the user login API."""
 
     @override_settings(DEBUG=True)
     def test_login_returns_user_and_sets_auth_cookies(self):
+        """Authenticate a user and verify the authentication cookies."""
         user = User.objects.create_user(
             username="quiz_user",
             email="quiz@example.com",
@@ -46,30 +47,14 @@ class LoginTests(APITestCase):
         self.assertIn("access_token", response.cookies)
         self.assertIn("refresh_token", response.cookies)
 
-        self.assertTrue(
-            response.cookies["access_token"]["httponly"]
-        )
-        self.assertTrue(
-            response.cookies["refresh_token"]["httponly"]
-        )
-
-        self.assertEqual(
-            response.cookies["access_token"]["samesite"],
-            "Lax",
-        )
-        self.assertEqual(
-            response.cookies["refresh_token"]["samesite"],
-            "Lax",
-        )
-
-        self.assertFalse(
-            response.cookies["access_token"]["secure"]
-        )
-        self.assertFalse(
-            response.cookies["refresh_token"]["secure"]
-        )
+        for cookie_name in ("access_token", "refresh_token"):
+            cookie = response.cookies[cookie_name]
+            self.assertTrue(cookie["httponly"])
+            self.assertEqual(cookie["samesite"], "Lax")
+            self.assertFalse(cookie["secure"])
 
     def test_login_rejects_missing_fields(self):
+        """Reject login requests with missing credentials."""
         response = self.client.post(
             "/api/login/",
             {},
@@ -79,6 +64,7 @@ class LoginTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_login_rejects_invalid_credentials(self):
+        """Reject login requests with an incorrect password."""
         User.objects.create_user(
             username="quiz_user",
             email="quiz@example.com",
@@ -94,19 +80,14 @@ class LoginTests(APITestCase):
             format="json",
         )
 
-        print("STATUS:", response.status_code)
-        print("DATA:", response.data)
-        print("CONTENT:", response.content)
-
         self.assertEqual(response.status_code, 401)
         self.assertEqual(
             response.json(),
-            {
-                "detail": "Invalid username or password."
-            },
+            {"detail": "Invalid username or password."},
         )
 
     def test_login_rejects_unknown_username(self):
+        """Reject login requests for unknown usernames."""
         response = self.client.post(
             "/api/login/",
             {
@@ -119,13 +100,12 @@ class LoginTests(APITestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(
             response.json(),
-            {
-                "detail": "Invalid username or password."
-            },
+            {"detail": "Invalid username or password."},
         )
 
     @override_settings(DEBUG=False)
     def test_login_sets_secure_auth_cookies(self):
+        """Ensure authentication cookies are secure in production."""
         User.objects.create_user(
             username="secure_user",
             email="secure@example.com",
@@ -142,17 +122,16 @@ class LoginTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(
-            response.cookies["access_token"]["secure"]
-        )
-        self.assertTrue(
-            response.cookies["refresh_token"]["secure"]
-        )
+
+        for cookie_name in ("access_token", "refresh_token"):
+            self.assertTrue(response.cookies[cookie_name]["secure"])
 
 
 class LoginSerializerTests(APITestCase):
+    """Test the login serializer."""
 
     def test_login_serializer_accepts_valid_credentials(self):
+        """Accept valid username and password combinations."""
         User.objects.create_user(
             username="quiz_user",
             email="quiz@example.com",
@@ -169,6 +148,7 @@ class LoginSerializerTests(APITestCase):
         self.assertTrue(serializer.is_valid())
 
     def test_login_serializer_rejects_invalid_credentials(self):
+        """Raise an authentication error for invalid credentials."""
         User.objects.create_user(
             username="quiz_user",
             email="quiz@example.com",
