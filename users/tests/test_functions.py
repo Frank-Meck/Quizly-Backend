@@ -3,12 +3,12 @@ from django.test import TestCase
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.functions import (
-    authenticate_user,
-    create_auth_tokens,
+from users.services.authentication import authenticate_user
+from users.services.registration import (
     create_registered_user,
     validate_registration_data,
 )
+from users.services.tokens import create_auth_tokens
 
 
 User = get_user_model()

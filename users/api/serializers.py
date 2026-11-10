@@ -3,8 +3,8 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.functions import (
-    authenticate_user,
+from users.services.authentication import authenticate_user
+from users.services.registration import (
     create_registered_user,
     validate_unique_email,
     validate_unique_username,

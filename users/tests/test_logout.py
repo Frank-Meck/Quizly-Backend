@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
-from users.serializers import LogoutSerializer
+from users.api.serializers import LogoutSerializer
 
 
 User = get_user_model()

@@ -4,7 +4,7 @@ from django.test import override_settings
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APITestCase
 
-from users.serializers import LoginSerializer
+from users.api.serializers import LoginSerializer
 
 
 User = get_user_model()

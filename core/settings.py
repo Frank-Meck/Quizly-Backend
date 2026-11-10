@@ -165,7 +165,7 @@ CSRF_TRUSTED_ORIGINS = [
 # Django REST framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "users.authentication.CookieJWTAuthentication",
+        "users.api.authentication.CookieJWTAuthentication",
     ],
 }
 

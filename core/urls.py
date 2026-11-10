@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.urls import path
 
 from quizzes.api.views import CreateQuizView, GetQuizView
-from users.views import (
+from users.api.views import (
     LoginView,
     LogoutView,
     RegisterView,

@@ -1,18 +1,19 @@
+
 from django.conf import settings
 
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, ValidationError
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.functions import create_auth_tokens
-from users.serializers import (
+from users.api.serializers import (
     LoginSerializer,
     LogoutSerializer,
     RegisterSerializer,
     TokenRefreshSerializer,
 )
+from users.services.tokens import create_auth_tokens
 
 
 class RegisterView(APIView):
