@@ -1,11 +1,11 @@
-
 """Test YouTube transcript extraction and subtitle processing."""
 
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-from quizzes.functions import (
+from quizzes.services.transcripts import (
+    _download_transcript_track,
     clean_subtitle_text,
     download_subtitle_text,
     get_youtube_transcript,
@@ -15,7 +15,7 @@ from quizzes.functions import (
 class GetYouTubeTranscriptTests(SimpleTestCase):
     """Test transcript extraction from YouTube subtitles."""
 
-    @patch("quizzes.functions.yt_dlp.YoutubeDL")
+    @patch("quizzes.services.transcripts.yt_dlp.YoutubeDL")
     def test_extracts_transcript_from_subtitles(self, mock_youtube_dl):
         """Extract a transcript from manually provided subtitles."""
         mock_instance = (
@@ -29,7 +29,7 @@ class GetYouTubeTranscriptTests(SimpleTestCase):
         }
 
         with patch(
-            "quizzes.functions.download_subtitle_text",
+            "quizzes.services.transcripts.download_subtitle_text",
             return_value="Python is a programming language.",
         ):
             transcript = get_youtube_transcript(
@@ -41,7 +41,7 @@ class GetYouTubeTranscriptTests(SimpleTestCase):
             "Python is a programming language.",
         )
 
-    @patch("quizzes.functions.yt_dlp.YoutubeDL")
+    @patch("quizzes.services.transcripts.yt_dlp.YoutubeDL")
     def test_extracts_plain_text_from_subtitles(self, mock_youtube_dl):
         """Remove subtitle timestamps before returning the transcript."""
         mock_instance = (
@@ -62,7 +62,7 @@ class GetYouTubeTranscriptTests(SimpleTestCase):
         )
 
         with patch(
-            "quizzes.functions.download_subtitle_text",
+            "quizzes.services.transcripts.download_subtitle_text",
             return_value=subtitle_text,
         ):
             transcript = get_youtube_transcript(
@@ -78,7 +78,7 @@ class GetYouTubeTranscriptTests(SimpleTestCase):
 class SubtitleHelperTests(SimpleTestCase):
     """Test downloading and cleaning subtitle text."""
 
-    @patch("quizzes.functions.requests.get")
+    @patch("quizzes.services.transcripts.requests.get")
     def test_downloads_subtitle_text(self, mock_get):
         """Download subtitle content and check the HTTP response."""
         mock_response = mock_get.return_value
@@ -110,3 +110,19 @@ class SubtitleHelperTests(SimpleTestCase):
         result = clean_subtitle_text(subtitle_text)
 
         self.assertEqual(result, "Hello world")
+
+    @patch("quizzes.services.transcripts.download_subtitle_text")
+    def test_skips_tracks_without_subtitle_url(
+        self,
+        mock_download_subtitle_text,
+    ):
+        """Skip subtitle tracks without a URL."""
+        tracks = [
+            {"ext": "vtt"},
+            {"ext": "json"},
+        ]
+
+        result = _download_transcript_track(tracks, "en")
+
+        self.assertIsNone(result)
+        mock_download_subtitle_text.assert_not_called()

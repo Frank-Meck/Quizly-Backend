@@ -2,9 +2,9 @@
 
 Django REST API für **Quizly** – eine Anwendung, mit der Benutzer aus YouTube-Videos automatisch interaktive Multiple-Choice-Quizze erstellen können.
 
-Das Backend verwaltet Benutzerkonten, Authentifizierung, Quizze und Fragen. Die Quizgenerierung basiert auf der automatischen Transkription von Videoinhalten und der anschließenden Verarbeitung durch ein KI-Modell.
+Das Backend verwaltet Benutzerkonten, Authentifizierung, Quizze und Fragen. Die Quizgenerierung basiert auf der Transkription von Videoinhalten und der anschließenden Verarbeitung durch ein KI-Modell.
 
-> **Projektstatus:** In Entwicklung. Diese Dokumentation beschreibt die geplante Zielarchitektur und API. Einzelne Funktionen können noch nicht implementiert sein.
+**Projektstatus:** In Entwicklung. Die zentralen Funktionen für Benutzerverwaltung, Authentifizierung und Quizverwaltung sind implementiert und automatisiert getestet. Die Verarbeitung von YouTube-Videos und die Anbindung externer KI-Dienste benötigen die entsprechenden Systemvoraussetzungen und Zugangsdaten.
 
 ## Inhaltsverzeichnis
 
@@ -23,19 +23,19 @@ Das Backend verwaltet Benutzerkonten, Authentifizierung, Quizze und Fragen. Die 
 
 ## Features
 
-Das fertige Backend soll folgende Funktionen bereitstellen:
+Das Backend bietet folgende Funktionen:
 
 - Registrierung und Anmeldung von Benutzern
 - Authentifizierung mit Access- und Refresh-Tokens über HTTP-Cookies
 - Abmeldung mit Invalidierung des Refresh-Tokens
 - Erneuerung abgelaufener Access-Tokens
 - Erstellung von Quizzen anhand einer YouTube-URL
-- Automatischer Download der Audiospur mit `yt-dlp`
-- Transkription des Audios mit OpenAI Whisper
+- Verarbeitung von YouTube-Videos und Transkripten
+- Transkription von Audio mit OpenAI Whisper
 - Generierung von Quizfragen mit der Google Gemini API
-- Erstellung von zehn Multiple-Choice-Fragen mit jeweils vier Antwortoptionen
+- Erstellung von Multiple-Choice-Fragen mit jeweils vier Antwortoptionen
 - Auflisten, Abrufen, Aktualisieren und Löschen eigener Quizze
-- Automatisierte Tests mit pytest und pytest-django
+- Automatisierte Tests mit Django und pytest
 
 ## Technologien
 
@@ -47,17 +47,18 @@ Das fertige Backend soll folgende Funktionen bereitstellen:
 | djangorestframework-simplejwt | JWT-Unterstützung |
 | django-cors-headers | CORS-Konfiguration |
 | SQLite | Lokale Entwicklungs- und Testdatenbank |
-| yt-dlp | Download der YouTube-Audiospur |
+| yt-dlp | Abruf von YouTube-Inhalten |
 | FFmpeg | Verarbeitung und Konvertierung von Audio |
 | OpenAI Whisper | Transkription von Audio in Text |
 | Google Gemini API | Generierung von Quizfragen |
-| google-genai | Offizielles Python-SDK für Gemini |
+| google-genai | Python-SDK für Gemini |
+| python-dotenv | Laden von Umgebungsvariablen |
 | pytest | Testframework |
 | pytest-django | Django-Integration für pytest |
 
 ## Projektstruktur
 
-Die Projektstruktur wird im Verlauf der Entwicklung erweitert. Die folgende Darstellung zeigt die vorgesehene Organisation des Backends.
+Die folgende Darstellung zeigt die aktuelle Struktur des Backends. Automatisch erzeugte Dateien und Verzeichnisse wie `__pycache__`, `.pytest_cache` und die virtuelle Umgebung sind nicht aufgeführt.
 
 ```text
 backend/
@@ -70,23 +71,38 @@ backend/
 ├── users/
 │   ├── migrations/
 │   ├── tests/
+│   │   ├── test_functions.py
+│   │   ├── test_login.py
+│   │   ├── test_logout.py
+│   │   ├── test_register.py
+│   │   └── test_token_refresh.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── authentication.py
+│   ├── functions.py
 │   ├── models.py
 │   ├── serializers.py
-│   ├── urls.py
 │   └── views.py
 ├── quizzes/
 │   ├── migrations/
 │   ├── tests/
+│   │   ├── test_create_quiz.py
+│   │   ├── test_delete_quiz.py
+│   │   ├── test_functions_gemini.py
+│   │   ├── test_functions_transcripts.py
+│   │   ├── test_functions_validation.py
+│   │   ├── test_functions_whisper.py
+│   │   ├── test_get_quiz.py
+│   │   ├── test_list_quizzes.py
+│   │   ├── test_models.py
+│   │   └── test_update_quiz.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── functions.py
 │   ├── models.py
 │   ├── serializers.py
-│   ├── urls.py
 │   └── views.py
-├── services/
-│   ├── youtube.py
-│   ├── transcription.py
-│   └── quiz_generation.py
 ├── docs/
-│   └── er-diagram.png
 ├── manage.py
 ├── pytest.ini
 ├── requirements.txt
@@ -95,7 +111,7 @@ backend/
 └── README.md
 ```
 
-Die Struktur dient als Zielbild. Zusätzliche Dateien und Module können je nach Implementierung hinzukommen.
+Die API-Routen werden zentral in `core/urls.py` definiert. Die Verarbeitung der Quizgenerierung befindet sich derzeit in `quizzes/functions.py`.
 
 ## Architektur und Datenbankmodell
 
@@ -103,7 +119,7 @@ Das Datenmodell besteht aus drei zentralen Entitäten: `User`, `Quiz` und `Quest
 
 ### User
 
-Verwaltet die registrierten Benutzer. Das Projekt verwendet das eingebaute Django-User-Modell.
+Das Projekt verwendet das eingebaute Django-User-Modell.
 
 Wichtige Felder:
 
@@ -127,8 +143,8 @@ Ein Quiz gehört zu genau einem Benutzer. Ein Benutzer kann mehrere Quizze besit
 | `id` | Primärschlüssel |
 | `user_id` | Fremdschlüssel zum Besitzer |
 | `title` | Titel des Quiz |
-| `description` | Beschreibung mit maximal 150 Zeichen |
-| `video_url` | Normalisierte YouTube-URL |
+| `description` | Beschreibung |
+| `video_url` | YouTube-URL |
 | `created_at` | Erstellungszeitpunkt |
 | `updated_at` | Zeitpunkt der letzten Änderung |
 
@@ -141,7 +157,7 @@ Eine Frage gehört zu genau einem Quiz. Ein Quiz kann mehrere Fragen enthalten.
 | `id` | Primärschlüssel |
 | `quiz_id` | Fremdschlüssel zum Quiz |
 | `question_title` | Fragetext |
-| `question_options` | Vier Antwortoptionen, gespeichert als JSON-Array |
+| `question_options` | Antwortoptionen, gespeichert als JSON-Array |
 | `answer` | Richtige Antwort |
 | `created_at` | Erstellungszeitpunkt |
 | `updated_at` | Zeitpunkt der letzten Änderung |
@@ -153,13 +169,7 @@ Jede generierte Frage soll genau vier unterschiedliche Antwortoptionen besitzen.
 - `User 1:n Quiz`
 - `Quiz 1:n Question`
 
-Beim Löschen eines Quiz werden auch die zugehörigen Fragen gelöscht. Beim Löschen eines Benutzers muss die Löschstrategie für dessen Quizze ausdrücklich in den Django-Modellen festgelegt werden.
-
-### ER-Diagramm
-
-Das Diagramm veranschaulicht die Beziehungen zwischen User, Quiz und Question.
-
-![ER-Diagramm des Quizly-Backends](docs/er-diagram.png)
+Beim Löschen eines Quiz werden die zugehörigen Fragen ebenfalls gelöscht. Die Löschstrategie für Benutzer und deren Quizze wird über die Django-Modellbeziehungen festgelegt.
 
 ## API-Dokumentation
 
@@ -167,7 +177,7 @@ Das Diagramm veranschaulicht die Beziehungen zwischen User, Quiz und Question.
 
 `http://127.0.0.1:8000`
 
-Die API verwendet JSON für Request- und Response-Bodies, sofern nicht anders angegeben. Die nachfolgenden Endpunkte beschreiben das vorgesehene Verhalten der fertigen Anwendung.
+Die API verwendet JSON für Request- und Response-Bodies, sofern nicht anders angegeben.
 
 ### Übersicht der Endpunkte
 
@@ -177,7 +187,7 @@ Die API verwendet JSON für Request- und Response-Bodies, sofern nicht anders an
 | POST | `/api/login/` | Benutzer anmelden | Nein |
 | POST | `/api/logout/` | Benutzer abmelden | Ja |
 | POST | `/api/token/refresh/` | Access-Token erneuern | Refresh-Cookie |
-| POST | `/api/quizzes/` | Quiz generieren | Ja |
+| POST | `/api/quizzes/` | Quiz erstellen | Ja |
 | GET | `/api/quizzes/` | Eigene Quizze auflisten | Ja |
 | GET | `/api/quizzes/{id}/` | Einzelnes Quiz abrufen | Ja |
 | PATCH | `/api/quizzes/{id}/` | Quiz aktualisieren | Ja |
@@ -214,8 +224,6 @@ Mögliche Fehler:
 
 - `400 Bad Request` – ungültige Eingaben, bereits verwendeter Benutzername oder nicht übereinstimmende Passwörter.
 
-**Implementierungsstatus:** Implementiert und getestet. Automatisierte Tests prüfen erfolgreiche Registrierung, fehlende Pflichtfelder, abweichende Passwörter und doppelte E-Mail-Adressen. Die manuelle Prüfung mit Postman bestätigt `201 Created` bei erfolgreicher Registrierung und `400 Bad Request` bei einer bereits verwendeten E-Mail-Adresse.
-
 #### 2. Benutzer anmelden
 
 `POST /api/login/`
@@ -249,7 +257,7 @@ Bei erfolgreicher Anmeldung setzt der Server folgende Cookies:
 - `access_token` – für authentifizierte API-Anfragen
 - `refresh_token` – zum Erneuern des Access-Tokens
 
-Die Cookies sollen mit geeigneten Sicherheitsoptionen wie `HttpOnly`, `Secure` in HTTPS-Umgebungen und einer passenden `SameSite`-Einstellung konfiguriert werden.
+Die Cookies werden mit geeigneten Sicherheitsoptionen konfiguriert. Dazu gehören insbesondere `HttpOnly`, eine passende `SameSite`-Einstellung und `Secure` für HTTPS-Umgebungen.
 
 Mögliche Fehler:
 
@@ -260,7 +268,7 @@ Mögliche Fehler:
 
 `POST /api/logout/`
 
-Beendet eine authentifizierte Sitzung, löscht die Token-Cookies und invalidiert das Refresh-Token. Die Invalidierung setzt eine serverseitige Token-Blacklist oder eine gleichwertige Lösung voraus.
+Beendet eine authentifizierte Sitzung, löscht die Token-Cookies und invalidiert das Refresh-Token.
 
 Request:
 
@@ -330,14 +338,14 @@ Verarbeitungsablauf:
 
 1. Die URL validieren und die YouTube-Video-ID extrahieren.
 2. Die URL in ein einheitliches Format normalisieren.
-3. Die Audiospur mit `yt-dlp` herunterladen.
-4. Das Audio mit FFmpeg bei Bedarf konvertieren.
+3. Die verfügbaren Video- beziehungsweise Audiodaten abrufen.
+4. Das Audio bei Bedarf mit FFmpeg verarbeiten.
 5. Den gesprochenen Inhalt mit Whisper transkribieren.
 6. Das Transkript an Gemini übergeben.
-7. Zehn Multiple-Choice-Fragen mit jeweils vier Antwortoptionen generieren.
-8. Die KI-Antwort als JSON parsen und validieren.
+7. Multiple-Choice-Fragen mit jeweils vier Antwortoptionen generieren.
+8. Die KI-Antwort parsen und validieren.
 9. Das Quiz und die Fragen in der Datenbank speichern.
-10. Temporäre Audiodateien nach der Verarbeitung entfernen.
+10. Temporäre Dateien nach der Verarbeitung entfernen.
 
 Erfolgreiche Antwort: `201 Created`
 
@@ -367,7 +375,7 @@ Erfolgreiche Antwort: `201 Created`
 }
 ```
 
-Das Beispiel zeigt die Struktur der Antwort. Die endgültige Antwort soll zehn Fragen enthalten. Zeitstempel und IDs werden vom Backend erzeugt.
+Das Beispiel zeigt die Struktur der Antwort. Die tatsächliche Anzahl der Fragen richtet sich nach der implementierten Generierung. IDs und Zeitstempel werden vom Backend erzeugt.
 
 Mögliche Fehler:
 
@@ -375,8 +383,6 @@ Mögliche Fehler:
 - `401 Unauthorized` – fehlende oder ungültige Authentifizierung
 - `502 Bad Gateway` – Fehler bei einem externen Dienst, sofern dieser Status für den jeweiligen Fehler vorgesehen ist
 - `503 Service Unavailable` – vorübergehend nicht verfügbarer Verarbeitungsdienst
-
-Die konkrete Fehlerbehandlung wird während der Implementierung festgelegt.
 
 #### 6. Eigene Quizze auflisten
 
@@ -399,8 +405,6 @@ Erfolgreiche Antwort: `200 OK`
   }
 ]
 ```
-
-Das Beispiel dient der Veranschaulichung des Antwortformats. Die tatsächliche Liste enthält die gespeicherten Quizze des Benutzers.
 
 #### 7. Einzelnes Quiz abrufen
 
@@ -463,13 +467,15 @@ Mögliche Fehler:
 
 ### Voraussetzungen
 
-- Python 3.13 oder eine mit den verwendeten Abhängigkeiten kompatible Python-Version
+Für die lokale Entwicklung werden benötigt:
+
+- Python 3.13 oder eine mit den Abhängigkeiten kompatible Python-Version
 - Git
 - pip
 - FFmpeg
-- Ein Gemini-API-Schlüssel für die spätere Quizgenerierung
+- Ein Gemini-API-Schlüssel für die Quizgenerierung
 
-Whisper benötigt zusätzliche Abhängigkeiten, insbesondere PyTorch. Die erste Verwendung eines Whisper-Modells kann einen zusätzlichen Modelldownload erfordern.
+Whisper benötigt zusätzliche Abhängigkeiten, insbesondere PyTorch. Beim ersten Einsatz eines Whisper-Modells kann ein zusätzlicher Modelldownload erforderlich sein.
 
 ### 1. Repository klonen
 
@@ -487,7 +493,17 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Falls PowerShell die Aktivierung blockiert, muss gegebenenfalls die Ausführungsrichtlinie für den aktuellen Benutzer angepasst werden.
+Falls PowerShell die Aktivierung des virtuellen Environments blockiert, kann die Ausführungsrichtlinie für den aktuellen Benutzer angepasst werden:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Anschließend kann die virtuelle Umgebung erneut aktiviert werden:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
 ### 3. Abhängigkeiten installieren
 
@@ -502,34 +518,43 @@ python -m pip install -r requirements.txt
 ffmpeg -version
 ```
 
-FFmpeg muss über die Kommandozeile erreichbar sein. Es wird von der Audioverarbeitung und Whisper verwendet.
+FFmpeg muss über die Kommandozeile erreichbar sein. Es wird für die Audioverarbeitung benötigt.
 
 ### 5. Umgebungsvariablen konfigurieren
 
-Erstelle anhand von `.env.example` eine lokale `.env`-Datei.
-
-Windows PowerShell:
+Erstelle anhand von `.env.example` eine lokale `.env`-Datei:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Öffne anschließend die neu erstellte `.env`-Datei und trage dort deinen persönlichen Gemini-API-Schlüssel ein.
+Öffne anschließend die `.env`-Datei und trage deine persönlichen Werte ein.
 
-Beispiel für den Inhalt der `.env`-Datei:
+Beispiel:
 
 ```dotenv
+SECRET_KEY=your_generated_django_secret_key
+DEBUG=True
+ALLOWED_HOSTS=127.0.0.1,localhost
 GEMINI_API_KEY=your_actual_gemini_api_key
 ```
 
-Ersetze `your_actual_gemini_api_key` durch deinen echten Gemini-API-Key.
+Einen Django-Secret-Key kannst du beispielsweise mit folgendem Befehl erzeugen:
+
+```powershell
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+Kopiere den erzeugten Wert in die `.env`-Datei.
 
 **Wichtig:**
 
+- `SECRET_KEY` ist verpflichtend. Ohne diesen Wert startet Django nicht.
+- `GEMINI_API_KEY` wird für die Anbindung der Gemini API benötigt.
+- `DEBUG=True` ist ausschließlich für die lokale Entwicklung vorgesehen.
+- `ALLOWED_HOSTS` enthält die erlaubten Hostnamen, getrennt durch Kommata.
 - Die `.env`-Datei enthält persönliche Zugangsdaten und darf nicht in Git eingecheckt werden.
-- Die `.env.example`-Datei dient als Vorlage und bleibt im Repository erhalten.
-- Der echte API-Key darf niemals in die `.env.example`-Datei eingetragen werden.
-- Die Anwendung muss die Umgebungsvariablen zur Laufzeit laden. Dafür kann beispielsweise `python-dotenv` verwendet werden; alternativ können die Variablen direkt in der Umgebung gesetzt werden.
+- Die `.env.example`-Datei dient als Vorlage und enthält keine echten Geheimnisse.
 
 ### 6. Datenbank vorbereiten
 
@@ -555,9 +580,22 @@ python manage.py createsuperuser
 
 Dieser Schritt ist optional und setzt die entsprechende Django-Admin-Konfiguration voraus.
 
+## Umgebungsvariablen
+
+Die Anwendung lädt die Konfiguration aus der `.env`-Datei im Backend-Hauptverzeichnis.
+
+| Variable | Beschreibung | Beispiel |
+|---|---|---|
+| `SECRET_KEY` | Django-Sicherheitsschlüssel | Generierter Schlüssel |
+| `DEBUG` | Aktiviert den Debug-Modus | `True` oder `False` |
+| `ALLOWED_HOSTS` | Erlaubte Hostnamen | `127.0.0.1,localhost` |
+| `GEMINI_API_KEY` | API-Schlüssel für Gemini | Persönlicher API-Key |
+
+Die tatsächlichen Werte werden lokal in der `.env`-Datei hinterlegt und nicht versioniert.
+
 ## Tests
 
-Das Projekt verwendet pytest und pytest-django. Die Testkonfiguration befindet sich in `pytest.ini`; für Tests wird `core.test_settings` verwendet.
+Das Projekt verwendet pytest und pytest-django. Die Testkonfiguration befindet sich in `pytest.ini`. Für Tests wird `core.test_settings` verwendet.
 
 Die Testeinstellungen nutzen eine In-Memory-SQLite-Datenbank und einen schnellen Passwort-Hasher.
 
@@ -565,6 +603,12 @@ Die Testeinstellungen nutzen eine In-Memory-SQLite-Datenbank und einen schnellen
 
 ```powershell
 python -m pytest
+```
+
+Alternativ können die Tests direkt über Django gestartet werden:
+
+```powershell
+python manage.py test --settings=core.test_settings
 ```
 
 ### Einzelnen Test ausführen
@@ -583,30 +627,28 @@ python -m pytest users/tests/test_register.py
 - Externe Aufrufe an YouTube, Whisper und Gemini in automatisierten Tests mocken.
 - Tests reproduzierbar und unabhängig von echten API-Schlüsseln halten.
 
-Für Integrationstests mit echten externen Diensten sind eine gesonderte Konfiguration und die entsprechenden Zugangsdaten erforderlich.
+Integrationstests mit echten externen Diensten benötigen eine gesonderte Konfiguration und entsprechende Zugangsdaten.
 
 ## Sicherheit
 
-Bei der Implementierung sind insbesondere folgende Punkte zu berücksichtigen:
+Bei der Implementierung werden insbesondere folgende Punkte berücksichtigt:
 
 - Passwörter ausschließlich über die Django-Authentifizierungsfunktionen verarbeiten.
 - API-Schlüssel und andere Geheimnisse über Umgebungsvariablen bereitstellen.
 - `.env` und lokale Datenbankdateien nicht versionieren.
 - Authentifizierungs- und Berechtigungsprüfungen für geschützte Endpunkte durchführen.
-- Zugriffe auf Quizze immer auf den angemeldeten Besitzer beschränken.
-- Cookie-Optionen passend zur jeweiligen Entwicklungs- und Produktionsumgebung konfigurieren.
+- Zugriffe auf Quizze auf den angemeldeten Besitzer beschränken.
+- Cookie-Optionen passend zur Entwicklungs- und Produktionsumgebung konfigurieren.
 - Für produktive Umgebungen HTTPS verwenden.
 - CORS auf tatsächlich benötigte Frontend-Ursprünge begrenzen.
-- YouTube-URLs serverseitig validieren und unerlaubte Zieladressen verhindern.
+- YouTube-URLs serverseitig validieren.
 - Externe Dienstfehler behandeln, ohne Geheimnisse oder interne Details offenzulegen.
 - Temporäre Audio- und Transkriptionsdateien nach Abschluss der Verarbeitung entfernen.
 - Eingaben und KI-generierte Inhalte vor dem Speichern validieren.
 
-Die hier genannten Maßnahmen beschreiben die vorgesehenen Sicherheitsanforderungen. Sie gelten erst als umgesetzt, wenn die zugehörige Implementierung und Tests vorhanden sind.
-
 ## Fehlerbehandlung
 
-Die Anwendung soll Fehler aus den einzelnen Verarbeitungsschritten kontrolliert behandeln.
+Die Anwendung behandelt Fehler aus den einzelnen Verarbeitungsschritten kontrolliert.
 
 Dazu gehören insbesondere:
 
@@ -619,7 +661,7 @@ Dazu gehören insbesondere:
 - Fehlende oder ungültige Authentifizierung
 - Nicht vorhandene Ressourcen oder fehlende Berechtigungen
 
-KI-generierte Antworten müssen validiert werden. Es darf nicht vorausgesetzt werden, dass das Modell immer korrektes JSON mit genau zehn Fragen und jeweils vier gültigen Antwortoptionen zurückgibt.
+KI-generierte Antworten werden validiert. Es wird nicht vorausgesetzt, dass das Modell immer korrektes JSON mit der erwarteten Anzahl von Fragen und Antwortoptionen zurückgibt.
 
 ## Entwicklungsworkflow
 
@@ -632,7 +674,7 @@ Das Backend wird schrittweise testgetrieben entwickelt (TDD):
 5. Tests erneut ausführen und Fehler beheben.
 6. Änderungen prüfen und mit einer passenden Commit-Nachricht sichern.
 
-Die API-Dokumentation beschreibt den geplanten Funktionsumfang. Sie wird aktualisiert, wenn sich die verbindliche API-Spezifikation ändert.
+Die API-Dokumentation wird aktualisiert, wenn sich die verbindliche API-Spezifikation ändert.
 
 ## Git-Commit-Konventionen
 
@@ -668,4 +710,6 @@ chore: update gitignore
 
 ## Lizenz und Nutzung
 
-Die Lizenz und Nutzungsbedingungen des Projekts sind entsprechend den Vorgaben des Projektinhabers festzulegen. Vor einer öffentlichen Veröffentlichung sollten außerdem die Nutzungsbedingungen der eingebundenen externen Dienste und die Rechte an verarbeiteten Videoinhalten berücksichtigt werden.
+Die Lizenz und Nutzungsbedingungen des Projekts sind entsprechend den Vorgaben des Projektinhabers festzulegen.
+
+Vor einer öffentlichen Veröffentlichung sollten außerdem die Nutzungsbedingungen der eingebundenen externen Dienste und die Rechte an verarbeiteten Videoinhalten berücksichtigt werden.

@@ -3,7 +3,7 @@
 
 from django.test import SimpleTestCase
 
-from quizzes.functions import validate_quiz_data
+from quizzes.services.validation import validate_quiz_data
 
 
 def _build_valid_quiz_data():
@@ -127,10 +127,7 @@ class ValidateQuizDataTests(SimpleTestCase):
         quiz_data = _build_valid_quiz_data()
         quiz_data["description"] = "A" * 150
 
-        try:
-            validate_quiz_data(quiz_data)
-        except ValueError:
-            self.fail("A 150-character description should be valid.")
+        validate_quiz_data(quiz_data)
 
     def test_rejects_duplicate_questions(self):
         """Reject quizzes containing duplicate question titles."""

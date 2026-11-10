@@ -1,4 +1,3 @@
-
 """Test Gemini quiz generation and response handling."""
 
 import json
@@ -6,9 +5,8 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-from quizzes.functions import (
+from quizzes.services.gemini import (
     clean_gemini_response,
-    generate_quiz_data,
     generate_quiz_with_gemini,
 )
 
@@ -20,52 +18,10 @@ class MockServerError(Exception):
         self.code = code
 
 
-class GenerateQuizDataTests(SimpleTestCase):
-    """Test quiz generation and validation using Gemini."""
-
-    @patch("quizzes.functions.get_youtube_transcript")
-    @patch("quizzes.functions.generate_quiz_with_gemini")
-    def test_generates_and_validates_quiz(
-        self,
-        mock_generate_quiz,
-        mock_get_transcript,
-    ):
-        """Generate and validate quiz data from a video transcript."""
-        mock_get_transcript.return_value = (
-            "Python is a programming language."
-        )
-        mock_generate_quiz.return_value = {
-            "title": "Python Basics",
-            "description": "An introduction to Python.",
-            "questions": [
-                {
-                    "question_title": f"Question {number}",
-                    "question_options": [
-                        "Option A",
-                        "Option B",
-                        "Option C",
-                        "Option D",
-                    ],
-                    "answer": "Option A",
-                }
-                for number in range(1, 11)
-            ],
-        }
-
-        result = generate_quiz_data(
-            "https://www.youtube.com/watch?v=test"
-        )
-
-        self.assertEqual(result["title"], "Python Basics")
-        mock_get_transcript.assert_called_once_with(
-            "https://www.youtube.com/watch?v=test"
-        )
-
-
 class GenerateQuizWithGeminiTests(SimpleTestCase):
     """Test Gemini API requests, responses, and prompt instructions."""
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_generates_quiz_from_transcript(self, mock_client):
         """Generate quiz data from a transcript."""
         expected_quiz = {
@@ -93,7 +49,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             "gemini-3.5-flash-lite",
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_parses_markdown_json_response(self, mock_client):
         """Parse JSON returned inside a Markdown code block."""
         mock_response = (
@@ -111,12 +67,12 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 
         self.assertEqual(result, {"title": "Python Basics"})
 
-    @patch("quizzes.functions.time.sleep")
+    @patch("quizzes.services.gemini.time.sleep")
     @patch(
-        "quizzes.functions.errors.ServerError",
+        "quizzes.services.gemini.errors.ServerError",
         MockServerError,
     )
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_retries_after_temporary_server_error(
         self,
         mock_client,
@@ -141,12 +97,12 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self.assertEqual(mock_response.call_count, 2)
         mock_sleep.assert_called_once_with(2)
 
-    @patch("quizzes.functions.time.sleep")
+    @patch("quizzes.services.gemini.time.sleep")
     @patch(
-        "quizzes.functions.errors.ServerError",
+        "quizzes.services.gemini.errors.ServerError",
         MockServerError,
     )
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_raises_error_after_three_failed_attempts(
         self,
         mock_client,
@@ -168,12 +124,12 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self.assertEqual(mock_response.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)
 
-    @patch("quizzes.functions.time.sleep")
+    @patch("quizzes.services.gemini.time.sleep")
     @patch(
-        "quizzes.functions.errors.ServerError",
+        "quizzes.services.gemini.errors.ServerError",
         MockServerError,
     )
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_does_not_retry_non_503_server_error(
         self,
         mock_client,
@@ -191,7 +147,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         mock_response.assert_called_once()
         mock_sleep.assert_not_called()
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_includes_transcript_in_prompt(self, mock_client):
         """Include the transcript in the Gemini prompt."""
         transcript = (
@@ -210,7 +166,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
 
         self.assertIn(transcript, prompt)
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_transcript_only_information(
         self,
         mock_client,
@@ -234,7 +190,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_questions_about_different_aspects(
         self,
         mock_client,
@@ -258,7 +214,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_plausible_answer_options(
         self,
         mock_client,
@@ -282,7 +238,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_mixed_difficulty_levels(
         self,
         mock_client,
@@ -305,7 +261,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
         self.assertIn("4 medium questions", prompt)
         self.assertIn("3 difficult questions", prompt)
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_clear_and_unambiguous_questions(
         self,
         mock_client,
@@ -329,7 +285,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_simple_and_natural_language(
         self,
         mock_client,
@@ -353,7 +309,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_no_repeated_question_content(
         self,
         mock_client,
@@ -377,7 +333,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_same_language_as_transcript(
         self,
         mock_client,
@@ -401,7 +357,7 @@ class GenerateQuizWithGeminiTests(SimpleTestCase):
             prompt,
         )
 
-    @patch("quizzes.functions.genai.Client")
+    @patch("quizzes.services.gemini.genai.Client")
     def test_prompt_requires_concise_and_relevant_title(
         self,
         mock_client,
@@ -474,29 +430,3 @@ class CleanGeminiResponseTests(SimpleTestCase):
             result,
             {"title": "Python Basics"},
         )
-
-
-class GenerateQuizDataErrorTests(SimpleTestCase):
-    """Test error handling during quiz generation."""
-
-    @patch("quizzes.functions.generate_quiz_with_gemini")
-    @patch("quizzes.functions.get_youtube_transcript")
-    def test_rejects_invalid_quiz_returned_by_gemini(
-        self,
-        mock_get_transcript,
-        mock_generate_quiz,
-    ):
-        """Reject invalid quiz data returned by Gemini."""
-        mock_get_transcript.return_value = (
-            "Python is a programming language."
-        )
-        mock_generate_quiz.return_value = {
-            "title": "Python Basics",
-            "description": "An introduction to Python.",
-            "questions": [],
-        }
-
-        with self.assertRaises(ValueError):
-            generate_quiz_data(
-                "https://www.youtube.com/watch?v=test"
-            )

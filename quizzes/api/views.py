@@ -8,14 +8,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from quizzes.functions import generate_quiz_data
-from quizzes.models import Quiz
-from quizzes.serializers import (
+from quizzes.api.serializers import (
     CreateQuizDataSerializer,
     CreateQuizSerializer,
     QuizSerializer,
     UpdateQuizSerializer,
 )
+from quizzes.models import Quiz
+from quizzes.services.quiz_generation import generate_quiz_data
 
 
 class CreateQuizView(APIView):
@@ -57,13 +57,17 @@ class GetQuizView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk):
+    def get_object(self, pk, user):
         """Return a quiz belonging to the authenticated user."""
-        quiz = get_object_or_404(
+        return get_object_or_404(
             Quiz,
             pk=pk,
-            user=request.user,
+            user=user,
         )
+
+    def get(self, request, pk):
+        """Return a quiz belonging to the authenticated user."""
+        quiz = self.get_object(pk, request.user)
         serializer = QuizSerializer(quiz)
 
         return Response(
@@ -73,11 +77,7 @@ class GetQuizView(APIView):
 
     def patch(self, request, pk):
         """Update a quiz belonging to the authenticated user."""
-        quiz = get_object_or_404(
-            Quiz,
-            pk=pk,
-            user=request.user,
-        )
+        quiz = self.get_object(pk, request.user)
         serializer = UpdateQuizSerializer(
             quiz,
             data=request.data,
@@ -93,11 +93,7 @@ class GetQuizView(APIView):
 
     def delete(self, request, pk):
         """Delete a quiz belonging to the authenticated user."""
-        quiz = get_object_or_404(
-            Quiz,
-            pk=pk,
-            user=request.user,
-        )
+        quiz = self.get_object(pk, request.user)
         quiz.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -1,4 +1,3 @@
-
 """Test quiz models, serializers, and API creation."""
 
 from unittest.mock import patch
@@ -8,7 +7,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase
 
 from quizzes.models import Question, Quiz
-from quizzes.serializers import (
+from quizzes.api.serializers import (
     CreateQuizDataSerializer,
     CreateQuizSerializer,
     QuizSerializer,
@@ -188,6 +187,56 @@ class CreateQuizSerializerTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("questions", serializer.errors)
 
+    def test_serializer_rejects_empty_question_options(self):
+        """Reject answer options that are empty or not strings."""
+        quiz_data = {
+            "title": "Python Basics",
+            "description": "An introduction to Python.",
+            "video_url": "https://www.youtube.com/watch?v=example",
+            "questions": [
+                {
+                    "question_title": "What is Python?",
+                    "question_options": [
+                        "Language",
+                        "",
+                        "Database",
+                        "Editor",
+                    ],
+                    "answer": "Language",
+                },
+            ],
+        }
+
+        serializer = CreateQuizDataSerializer(data=quiz_data)
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("questions", serializer.errors)
+
+    def test_serializer_rejects_duplicate_question_options(self):
+        """Reject answer options that are not unique."""
+        quiz_data = {
+            "title": "Python Basics",
+            "description": "An introduction to Python.",
+            "video_url": "https://www.youtube.com/watch?v=example",
+            "questions": [
+                {
+                    "question_title": "What is Python?",
+                    "question_options": [
+                        "Language",
+                        "Browser",
+                        " Language ",
+                        "Editor",
+                    ],
+                    "answer": "Language",
+                },
+            ],
+        }
+
+        serializer = CreateQuizDataSerializer(data=quiz_data)
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("questions", serializer.errors)
+
     def test_serializer_rejects_answer_not_in_options(self):
         """Reject answers that are not included in the options."""
         quiz_data = {
@@ -301,7 +350,7 @@ class CreateQuizTests(APITestCase):
 
         self.assertEqual(response.status_code, 400)
 
-    @patch("quizzes.views.generate_quiz_data")
+    @patch("quizzes.api.views.generate_quiz_data")
     def test_create_quiz_accepts_valid_youtube_url(
         self,
         mock_generate_quiz_data,
@@ -355,8 +404,8 @@ class CreateQuizTests(APITestCase):
             "https://www.youtube.com/watch?v=example"
         )
 
-    @patch("quizzes.views.generate_quiz_data")
-    @patch("quizzes.views.CreateQuizDataSerializer")
+    @patch("quizzes.api.views.generate_quiz_data")
+    @patch("quizzes.api.views.CreateQuizDataSerializer")
     def test_create_quiz_uses_create_quiz_data_serializer(
         self,
         mock_serializer_class,

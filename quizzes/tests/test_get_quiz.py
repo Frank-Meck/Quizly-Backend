@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
 from quizzes.models import Question, Quiz
-from quizzes.serializers import QuizSerializer
+from quizzes.api.serializers import QuizSerializer
 
 
 User = get_user_model()
