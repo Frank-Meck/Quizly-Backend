@@ -148,7 +148,7 @@ The API routes are defined centrally in `core/urls.py`.
 
 Quiz generation and its supporting functionality are organized in the `quizzes/services/` package.
 
-User authentication and registration functionality are organized in `users/services/`.
+User authentication and registration functionality are organized in the `users/services/` package.
 
 ## Architecture and Database Model
 
@@ -570,7 +570,32 @@ The dot (`.`) tells Git to use the current directory instead of creating another
 
 **Note:** The target directory must be empty when using Option 2.
 
-### 2. Create a Virtual Environment
+### 2. Open the Project in Visual Studio Code
+
+After cloning the repository, open the project folder in Visual Studio Code.
+
+**Option 1: Open from the terminal (recommended)**
+
+If you are already inside the project directory, run:
+
+```powershell
+code .
+```
+
+This opens the current project directory in Visual Studio Code.
+
+**Option 2: Open manually**
+
+1. Start Visual Studio Code.
+2. Select **File → Open Folder**.
+3. Navigate to the cloned project directory (e.g. `C:\Users\frank\Quizly-Backend`).
+4. Select the `Quizly-Backend` folder and click **Select Folder**.
+
+The project files and folders should now be visible in the VS Code Explorer.
+
+**Note:** Make sure you open the actual project directory containing `manage.py`, `README.md`, and `requirements.txt`, rather than its parent directory.
+
+### 3. Create a Virtual Environment
 
 On Windows PowerShell:
 
@@ -596,7 +621,7 @@ Then activate the virtual environment again:
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Install Dependencies
+### 4. Install Dependencies
 
 Upgrade pip:
 
@@ -610,7 +635,7 @@ Install the project dependencies:
 python -m pip install -r requirements.txt
 ```
 
-### 4. Verify FFmpeg
+### 5. Verify FFmpeg
 
 Check whether FFmpeg is available:
 
@@ -620,7 +645,7 @@ ffmpeg -version
 
 FFmpeg must be accessible from the command line. It is required for audio processing.
 
-### 5. Configure Environment Variables
+### 6. Configure Environment Variables
 
 Create a local `.env` file using `.env.example` as a template:
 
@@ -656,7 +681,7 @@ Copy the generated value into your `.env` file.
 - The `.env` file contains personal credentials and must never be committed to Git.
 - The `.env.example` file serves as a template and must not contain real secrets.
 
-### 6. Prepare the Database
+### 7. Prepare the Database
 
 Apply the database migrations:
 
@@ -664,7 +689,7 @@ Apply the database migrations:
 python manage.py migrate
 ```
 
-### 7. Start the Development Server
+### 8. Start the Development Server
 
 Start the Django development server:
 
@@ -680,7 +705,7 @@ http://127.0.0.1:8000/
 
 The root URL does not provide a frontend page. The backend exposes API endpoints instead.
 
-### 8. Optional: Create an Administrator Account
+### 9. Optional: Create an Administrator Account
 
 To access the Django administration area, create a superuser:
 
@@ -860,4 +885,4 @@ chore: update gitignore
 
 No license file is currently included in this repository. The license and usage terms should be determined according to the project owner's requirements.
 
-Before public distribution, the terms of use of integrated external services and the rights associated with processed video content should also be considered.# Quizly Backend
+Before public distribution, the terms of use of integrated external services and the rights associated with processed video content should also be considered.
